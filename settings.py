@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox
-from constants import DEFAULT_GEOMETRY, CONFIG_FILE
+from constants import DEFAULT_GEOMETRY, CONFIG_FILE, APP_NAME, AUTHOR, VERSION, PROJECT_URL
+from about_window import AboutWindow
 
 class SettingsWindow:
     def __init__(self, main_app):
@@ -167,7 +168,12 @@ class SettingsWindow:
         button_frame.grid(row=4, column=0, columnspan=2, pady=20, padx=15)
         
         tk.Button(button_frame, text="应用", command=self.apply_settings).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="关于", command=self._show_about).pack(side=tk.LEFT, padx=5)
         tk.Button(button_frame, text="退出程序", command=self.main_app.root.quit).pack(side=tk.LEFT, padx=5)
+
+    def _show_about(self) -> None:
+        """显示关于对话框"""
+        AboutWindow(self.window)
     
     def move_window(self, dx, dy):
         screen_width = self.main_app.root.winfo_screenwidth()
