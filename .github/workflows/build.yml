@@ -32,13 +32,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyinstaller
 
-      - name: Build executable
-        run: |
-          if (${{ matrix.include_runtime }}) {
-            pyinstaller --onefile --clean --distpath ./dist/${{ matrix.arch }}_with_runtime main.py
-          } else {
-            pyinstaller --onefile --clean --noconsole --distpath ./dist/${{ matrix.arch }}_without_runtime main.py
-          }
+      - name: Build with runtime executable
+        run: pyinstaller --onefile --clean --noconsole --distpath ./dist/${{ matrix.arch }}_with_runtime main.py
+
+      - name: Build without runtime executable
+        run: pyinstaller --clean --noconsole --distpath ./dist/${{ matrix.arch }}_without_runtime main.py
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
@@ -67,12 +65,42 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Upload Release Assets
+      - name: Upload x64 with runtime executable
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/
-          asset_name: build_assets
+          asset_path: dist/x64_with_runtime/main.exe
+          asset_name: main_x64_with_runtime.exe
+          asset_content_type: application/octet-stream
+
+      - name: Upload x64 without runtime executable
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/x64_without_runtime/main.exe
+          asset_name: main_x64_without_runtime.exe
+          asset_content_type: application/octet-stream
+
+      - name: Upload x86 with runtime executable
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/x86_with_runtime/main.exe
+          asset_name: main_x86_with_runtime.exe
+          asset_content_type: application/octet-stream
+
+      - name: Upload x86 without runtime executable
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/x86_without_runtime/main.exe
+          asset_name: main_x86_without_runtime.exe
           asset_content_type: application/octet-stream
