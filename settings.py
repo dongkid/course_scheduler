@@ -32,28 +32,45 @@ class SettingsWindow:
         self.window.grid_rowconfigure(2, weight=1)
         self.window.grid_rowconfigure(3, weight=1)
         self.window.grid_rowconfigure(4, weight=1)
+        self.window.grid_rowconfigure(5, weight=1)
         
-        # 第一行：窗口控制
+        # 第一行：排版设置
+        layout_frame = tk.LabelFrame(self.window, text="排版设置")
+        layout_frame.grid(row=0, column=0, columnspan=2, padx=10, pady=10, sticky='nsew')
+        
+        # 水平间距设置
+        tk.Label(layout_frame, text="水平间距:").pack(side=tk.LEFT, padx=5)
+        self.horizontal_padding = tk.Entry(layout_frame, width=5)
+        self.horizontal_padding.pack(side=tk.LEFT, padx=5)
+        self.horizontal_padding.insert(0, str(self.main_app.config_handler.horizontal_padding))
+        
+        # 垂直间距设置
+        tk.Label(layout_frame, text="垂直间距:").pack(side=tk.LEFT, padx=5)
+        self.vertical_padding = tk.Entry(layout_frame, width=5)
+        self.vertical_padding.pack(side=tk.LEFT, padx=5)
+        self.vertical_padding.insert(0, str(self.main_app.config_handler.vertical_padding))
+
+        # 第二行：窗口控制
         control_frame = tk.LabelFrame(self.window, text="窗口控制")
-        control_frame.grid(row=0, column=0, columnspan=2, padx=10, pady=10, sticky='nsew')
+        control_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=10, sticky='nsew')
         self._create_position_controls(control_frame)
         self._create_size_controls(control_frame)
         
-        # 第二行：课程设置
+        # 第三行：课程设置
         course_frame = tk.LabelFrame(self.window, text="课程设置")
-        course_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=10, sticky='nsew')
+        course_frame.grid(row=2, column=0, columnspan=2, padx=10, pady=10, sticky='nsew')
         self._create_course_duration_controls(course_frame)
         
-        # 第三行：倒计时与默认课表
+        # 第四行：倒计时与默认课表
         gaokao_frame = tk.LabelFrame(self.window, text="倒计时与默认课表")
-        gaokao_frame.grid(row=2, column=0, padx=10, pady=10, sticky='nsew')
+        gaokao_frame.grid(row=3, column=0, padx=10, pady=10, sticky='nsew')
         self._create_gaokao_controls(gaokao_frame)
         self._create_default_courses_controls(gaokao_frame)
         
-        # 第四行：字体设置
+        # 第五行：字体设置
         self._create_font_controls()
         
-        # 第五行：开机自启动
+        # 第六行：开机自启动
         self._create_auto_start_controls()
         
         # 底部：操作按钮
@@ -62,7 +79,7 @@ class SettingsWindow:
     def _create_auto_start_controls(self) -> None:
         """创建开机自启动设置"""
         auto_start_frame = tk.LabelFrame(self.window, text="开机自启动")
-        auto_start_frame.grid(row=3, column=1, padx=15, pady=15, sticky='nsew')
+        auto_start_frame.grid(row=4, column=1, padx=15, pady=15, sticky='nsew')
         
         self.auto_start_var = tk.BooleanVar(value=self.main_app.config_handler.auto_start)
         self.auto_start_check = tk.Checkbutton(
@@ -174,7 +191,7 @@ class SettingsWindow:
     def _create_font_controls(self) -> None:
         """创建字体设置控件"""
         font_frame = tk.LabelFrame(self.window, text="字体设置")
-        font_frame.grid(row=3, column=0, padx=10, pady=10, sticky='nsew')
+        font_frame.grid(row=4, column=0, padx=10, pady=10, sticky='nsew')
         
         # 字体大小设置
         tk.Label(font_frame, text="字体大小:").pack(side=tk.LEFT, padx=5)
@@ -197,7 +214,7 @@ class SettingsWindow:
     def _create_action_buttons(self) -> None:
         """创建操作按钮"""
         button_frame = tk.Frame(self.window)
-        button_frame.grid(row=4, column=0, columnspan=2, pady=20, padx=15)
+        button_frame.grid(row=5, column=0, columnspan=2, pady=20, padx=15)
         
         tk.Button(button_frame, text="应用", command=self.apply_settings).pack(side=tk.LEFT, padx=5)
         tk.Button(button_frame, text="关于", command=self._show_about).pack(side=tk.LEFT, padx=5)
@@ -236,6 +253,18 @@ class SettingsWindow:
     
     def apply_settings(self):
         try:
+            # 应用排版设置
+            try:
+                horizontal_padding = int(self.horizontal_padding.get())
+                vertical_padding = int(self.vertical_padding.get())
+                if horizontal_padding < 0 or vertical_padding < 0:
+                    raise ValueError
+                self.main_app.config_handler.horizontal_padding = horizontal_padding
+                self.main_app.config_handler.vertical_padding = vertical_padding
+            except ValueError:
+                messagebox.showerror("错误", "请输入有效的间距值")
+                return
+            
             # 应用窗口大小设置
             try:
                 width = int(self.width_entry.get())

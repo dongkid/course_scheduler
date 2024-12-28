@@ -16,6 +16,8 @@ class ConfigHandler:
         self.default_courses = ["语文", "数学", "英语", "物理", "化学", "生物", "历史", "地理", "政治"]
         self.font_size = 12
         self.font_color = "#000000"
+        self.horizontal_padding = 10
+        self.vertical_padding = 10
 
     def initialize_config(self):
         """加载或初始化配置文件"""
@@ -32,6 +34,8 @@ class ConfigHandler:
                 self.default_courses = self.config.get("default_courses", ["语文", "数学", "英语", "物理", "化学", "生物", "历史", "地理", "政治"])
                 self.font_size = self.config.get("font_size", 12)
                 self.font_color = self.config.get("font_color", "#000000")
+                self.horizontal_padding = self.config.get("horizontal_padding", 10)
+                self.vertical_padding = self.config.get("vertical_padding", 10)
         else:
             self.config = {"geometry": DEFAULT_GEOMETRY}
             self.gaokao_year = datetime.now().year + 1
@@ -62,5 +66,7 @@ class ConfigHandler:
         self.config["default_courses"] = self.default_courses
         self.config["font_size"] = self.font_size
         self.config["font_color"] = self.font_color
+        self.config["horizontal_padding"] = self.horizontal_padding
+        self.config["vertical_padding"] = self.vertical_padding
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(self.config, f, ensure_ascii=False, indent=2)

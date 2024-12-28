@@ -67,6 +67,10 @@ class CourseScheduler:
     
     def _initialize_ui(self) -> None:
         """初始化主界面"""
+        # 应用配置中的间距设置
+        self.root.configure(padx=self.config_handler.horizontal_padding, 
+                          pady=self.config_handler.vertical_padding)
+        
         self._create_time_display()
         self._create_countdown_display()
         self._create_schedule_display()
@@ -81,12 +85,12 @@ class CourseScheduler:
             fg=self.config_handler.font_color,
             bg="#ecf0f1"
         )
-        self.time_label.pack(pady=15, fill=tk.X)
+        self.time_label.pack(pady=self.config_handler.vertical_padding, fill=tk.X)
 
     def _create_countdown_display(self) -> None:
         """创建高考倒计时显示区域"""
         self.gaokao_frame = tk.Frame(self.root)
-        self.gaokao_frame.pack(pady=2)
+        self.gaokao_frame.pack(pady=self.config_handler.vertical_padding)
         
         # 第一行：显示"距离高考"
         self.gaokao_label1 = tk.Label(
@@ -122,12 +126,14 @@ class CourseScheduler:
     def _create_schedule_display(self) -> None:
         """创建课程表显示区域"""
         self.schedule_frame = tk.Frame(self.root)
-        self.schedule_frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+        self.schedule_frame.pack(padx=self.config_handler.horizontal_padding, 
+                               pady=self.config_handler.vertical_padding, 
+                               fill=tk.BOTH, expand=True)
 
     def _create_buttons(self) -> None:
         """创建功能按钮区域"""
         button_frame = tk.Frame(self.root)
-        button_frame.pack(pady=10)
+        button_frame.pack(pady=self.config_handler.vertical_padding)
         
         tk.Button(button_frame, text="编辑课表", command=self.open_editor).pack(side=tk.LEFT, padx=5)
         tk.Button(button_frame, text="设置", command=self.open_settings).pack(side=tk.LEFT, padx=5)
