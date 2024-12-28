@@ -17,7 +17,7 @@ class ConfigHandler:
         self.font_size = 12
         self.font_color = "#000000"
         self.horizontal_padding = 10
-        self.vertical_padding = 10
+        self.vertical_padding = 5
         self.time_display_size = 16
         self.countdown_size = 14
         self.schedule_size = 12
@@ -38,7 +38,7 @@ class ConfigHandler:
                 self.font_size = self.config.get("font_size", 12)
                 self.font_color = self.config.get("font_color", "#000000")
                 self.horizontal_padding = self.config.get("horizontal_padding", 10)
-                self.vertical_padding = self.config.get("vertical_padding", 10)
+                self.vertical_padding = self.config.get("vertical_padding", 5)
                 self.time_display_size = self.config.get("time_display_size", 20)
                 self.countdown_size = self.config.get("countdown_size", 18)
                 self.schedule_size = self.config.get("schedule_size", 16)
