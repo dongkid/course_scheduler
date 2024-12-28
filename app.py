@@ -75,6 +75,7 @@ class CourseScheduler:
         self._create_countdown_display()
         self._create_schedule_display()
         self._create_buttons()
+        self._update_font_settings()
         self._start_update_loop()
 
     def _create_time_display(self) -> None:
@@ -213,20 +214,46 @@ class CourseScheduler:
         if hasattr(label, 'status_canvas'):
             label.status_canvas.config(bg=color)
 
+    def _update_font_settings(self) -> None:
+        """更新所有UI组件的字体设置"""
+        # 更新时间显示
+        self.time_label.config(
+            font=("微软雅黑", self.config_handler.font_size, "bold"),
+            fg=self.config_handler.font_color
+        )
+        
+        # 更新高考倒计时显示
+        self.gaokao_label1.config(
+            font=("微软雅黑", self.config_handler.font_size - 4),
+            fg=self.config_handler.font_color
+        )
+        self.gaokao_label2.config(
+            font=("微软雅黑", self.config_handler.font_size - 2, "bold"),
+            fg=self.config_handler.font_color
+        )
+        self.gaokao_label3.config(
+            font=("微软雅黑", self.config_handler.font_size - 4),
+            fg=self.config_handler.font_color
+        )
+        
+        # 更新课程标签
+        self.course_labels = [label for label in self.course_labels if label.winfo_exists()]
+        for label in self.course_labels:
+            label.config(
+                font=("微软雅黑", self.config_handler.schedule_size, "bold"),
+                fg=self.config_handler.font_color
+            )
+        
+        # 强制更新所有部件
+        self.root.update_idletasks()
+
     def _adjust_ui_layout(self) -> None:
         """调整界面布局以适应窗口大小变化"""
         window_width = self.root.winfo_width()
         window_height = self.root.winfo_height()
         
-        # 调整时间显示字体大小，确保最小为10
-        font_size = max(10, min(16, int(window_width / 15)))
-        self.time_label.config(font=("Helvetica", font_size, "bold"))
-        
-        # 调整倒计时显示字体大小，确保最小为8
-        countdown_size = max(8, min(12, int(window_width / 20)))
-        self.gaokao_label1.config(font=("Helvetica", countdown_size))
-        self.gaokao_label2.config(font=("Helvetica", countdown_size + 2, "bold"))
-        self.gaokao_label3.config(font=("Helvetica", countdown_size))
+        # 更新字体设置
+        self._update_font_settings()
         
         # 调整课程表显示区域
         self.schedule_frame.config(padx=min(20, int(window_width / 20)))
@@ -237,9 +264,6 @@ class CourseScheduler:
                 child.config(pady=min(5, int(window_height / 50)))
         
         # 强制更新所有部件
-        self.time_label.update_idletasks()
-        self.gaokao_frame.update_idletasks()
-        self.schedule_frame.update_idletasks()
         self.root.update_idletasks()
 
     def _create_new_label(self, course: Dict[str, str], color: str) -> None:
@@ -291,6 +315,9 @@ class CourseScheduler:
         
         # 重新初始化界面
         self._initialize_ui()
+        
+        # 应用字体设置
+        self._adjust_ui_layout()
     
     def open_editor(self):
         from editor import EditorWindow

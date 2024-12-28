@@ -368,6 +368,8 @@ class SettingsWindow:
             self.main_app.config_handler.font_color = self.font_color
             
             self.main_app.config_handler.save_config()
+            # 更新字体设置
+            self.main_app._update_font_settings()
             messagebox.showinfo("成功", "设置已保存")
         except Exception as e:
             logger.log_error(e)
