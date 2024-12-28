@@ -1,106 +1,113 @@
 name: Build and Release
 
-permissions:
-  contents: write
-
 on:
   push:
     branches:
       - main
     tags:
-      - 'v*'
-  workflow_dispatch:
+      - '*'
 
 jobs:
   build:
     runs-on: windows-latest
-    strategy:
-      matrix:
-        arch: [x64, x86]
-        include_runtime: [true, false]
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.12'
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pyinstaller
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller
 
-      - name: Build with runtime executable
-        run: pyinstaller --onefile --clean --noconsole --distpath ./dist/${{ matrix.arch }}_with_runtime main.py
+    - name: Build 64-bit with Python
+      run: |
+        pyinstaller --onefile --name=app_64_py --icon=icon.ico --clean --noconfirm main.py
 
-      - name: Build without runtime executable
-        run: pyinstaller --clean --noconsole --distpath ./dist/${{ matrix.arch }}_without_runtime main.py
+    - name: Build 32-bit with Python
+      run: |
+        set PYTHONARCH=32
+        pyinstaller --onefile --name=app_32_py --icon=icon.ico --clean --noconfirm main.py
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: build_${{ matrix.arch }}_${{ matrix.include_runtime && 'with_runtime' || 'without_runtime' }}
-          path: dist/${{ matrix.arch }}_${{ matrix.include_runtime && 'with_runtime' || 'without_runtime' }}
+    - name: Build 64-bit without Python
+      run: |
+        pyinstaller --onefile --name=app_64_nopy --icon=icon.ico --clean --noconfirm --noconsole main.py
+
+    - name: Build 32-bit without Python
+      run: |
+        set PYTHONARCH=32
+        pyinstaller --onefile --name=app_32_nopy --icon=icon.ico --clean --noconfirm --noconsole main.py
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: executables
+        path: dist/
 
   release:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: windows-latest
+
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v3
-        with:
-          path: dist
+    - name: Download artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: executables
+        path: dist/
 
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
 
-      - name: Upload x64 with runtime executable
-        uses: actions/upload-release-asset@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/x64_with_runtime/main.exe
-          asset_name: main_x64_with_runtime.exe
-          asset_content_type: application/octet-stream
+    - name: Upload Release Assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: dist/app_64_py.exe
+        asset_name: app_64_py.exe
+        asset_content_type: application/octet-stream
 
-      - name: Upload x64 without runtime executable
-        uses: actions/upload-release-asset@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/x64_without_runtime/main.exe
-          asset_name: main_x64_without_runtime.exe
-          asset_content_type: application/octet-stream
+    - name: Upload Release Assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: dist/app_32_py.exe
+        asset_name: app_32_py.exe
+        asset_content_type: application/octet-stream
 
-      - name: Upload x86 with runtime executable
-        uses: actions/upload-release-asset@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/x86_with_runtime/main.exe
-          asset_name: main_x86_with_runtime.exe
-          asset_content_type: application/octet-stream
+    - name: Upload Release Assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: dist/app_64_nopy.exe
+        asset_name: app_64_nopy.exe
+        asset_content_type: application/octet-stream
 
-      - name: Upload x86 without runtime executable
-        uses: actions/upload-release-asset@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/x86_without_runtime/main.exe
-          asset_name: main_x86_without_runtime.exe
-          asset_content_type: application/octet-stream
+    - name: Upload Release Assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: dist/app_32_nopy.exe
+        asset_name: app_32_nopy.exe
+        asset_content_type: application/octet-stream
