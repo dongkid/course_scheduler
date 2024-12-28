@@ -33,10 +33,32 @@
 
 ## 安装与使用
 
-### 运行程序
+### 运行源码
 ```bash
+# 克隆仓库
+git clone https://github.com/your-repo/course_scheduler.git
+cd course_scheduler
+
+# 安装依赖
+pip install -r requirements.txt
+
+# 运行程序
 python main.py
 ```
+
+### 构建
+```bash
+# 安装PyInstaller
+pip install pyinstaller
+
+# 构建可执行文件
+pyinstaller --onefile --name=course_scheduler --icon=icon.ico --clean --noconfirm main.py
+
+# 构建完成后，可执行文件位于dist目录下
+```
+
+### GitHub Action构建
+本项目配置了GitHub Action自动构建，每次推送代码到main分支或创建tag时，会自动构建可执行文件并发布到Release页面。
 
 ## 贡献指南
 
