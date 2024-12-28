@@ -14,6 +14,8 @@ class ConfigHandler:
         self.auto_calculate_next_course = True
         self.break_duration = 10
         self.default_courses = ["语文", "数学", "英语", "物理", "化学", "生物", "历史", "地理", "政治"]
+        self.font_size = 12
+        self.font_color = "#000000"
 
     def initialize_config(self):
         """加载或初始化配置文件"""
@@ -28,6 +30,8 @@ class ConfigHandler:
                 self.auto_calculate_next_course = self.config.get("auto_calculate_next_course", True)
                 self.break_duration = self.config.get("break_duration", 10)
                 self.default_courses = self.config.get("default_courses", ["语文", "数学", "英语", "物理", "化学", "生物", "历史", "地理", "政治"])
+                self.font_size = self.config.get("font_size", 12)
+                self.font_color = self.config.get("font_color", "#000000")
         else:
             self.config = {"geometry": DEFAULT_GEOMETRY}
             self.gaokao_year = datetime.now().year + 1
@@ -56,5 +60,7 @@ class ConfigHandler:
         self.config["auto_calculate_next_course"] = self.auto_calculate_next_course
         self.config["break_duration"] = self.break_duration
         self.config["default_courses"] = self.default_courses
+        self.config["font_size"] = self.font_size
+        self.config["font_color"] = self.font_color
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(self.config, f, ensure_ascii=False, indent=2)

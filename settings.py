@@ -31,6 +31,7 @@ class SettingsWindow:
         self.window.grid_rowconfigure(1, weight=1)
         self.window.grid_rowconfigure(2, weight=1)
         self.window.grid_rowconfigure(3, weight=1)
+        self.window.grid_rowconfigure(4, weight=1)
         
         # 第一行：窗口控制
         control_frame = tk.LabelFrame(self.window, text="窗口控制")
@@ -49,7 +50,10 @@ class SettingsWindow:
         self._create_gaokao_controls(gaokao_frame)
         self._create_default_courses_controls(gaokao_frame)
         
-        # 第四行：开机自启动
+        # 第四行：字体设置
+        self._create_font_controls()
+        
+        # 第五行：开机自启动
         self._create_auto_start_controls()
         
         # 底部：操作按钮
@@ -167,6 +171,29 @@ class SettingsWindow:
         
         tk.Label(courses_frame, text="每行一个课程名称").pack()
 
+    def _create_font_controls(self) -> None:
+        """创建字体设置控件"""
+        font_frame = tk.LabelFrame(self.window, text="字体设置")
+        font_frame.grid(row=3, column=0, padx=10, pady=10, sticky='nsew')
+        
+        # 字体大小设置
+        tk.Label(font_frame, text="字体大小:").pack(side=tk.LEFT, padx=5)
+        self.font_size = tk.Scale(font_frame, from_=8, to=32, orient=tk.HORIZONTAL)
+        self.font_size.set(self.main_app.config_handler.font_size)
+        self.font_size.pack(side=tk.LEFT, padx=5)
+        
+        # 字体颜色设置
+        def choose_color():
+            color = tk.colorchooser.askcolor()[1]
+            if color:
+                self.font_color = color
+                self.color_preview.config(bg=color)
+        
+        self.font_color = self.main_app.config_handler.font_color
+        self.color_preview = tk.Label(font_frame, text="颜色", bg=self.font_color, width=5)
+        self.color_preview.pack(side=tk.LEFT, padx=5)
+        tk.Button(font_frame, text="选择颜色", command=choose_color).pack(side=tk.LEFT, padx=5)
+
     def _create_action_buttons(self) -> None:
         """创建操作按钮"""
         button_frame = tk.Frame(self.window)
@@ -174,7 +201,18 @@ class SettingsWindow:
         
         tk.Button(button_frame, text="应用", command=self.apply_settings).pack(side=tk.LEFT, padx=5)
         tk.Button(button_frame, text="关于", command=self._show_about).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="重启界面", command=self.restart_ui).pack(side=tk.LEFT, padx=5)
         tk.Button(button_frame, text="退出程序", command=self.main_app.root.quit).pack(side=tk.LEFT, padx=5)
+
+    def restart_ui(self) -> None:
+        """重启主界面"""
+        # 销毁现有界面组件
+        for widget in self.main_app.root.winfo_children():
+            widget.destroy()
+        
+        # 重新初始化界面
+        self.main_app._initialize_ui()
+        messagebox.showinfo("成功", "主界面已重启")
 
     def _show_about(self) -> None:
         """显示关于对话框"""
@@ -264,6 +302,10 @@ class SettingsWindow:
             # 应用默认课表设置
             courses = self.courses_text.get("1.0", tk.END).strip().split("\n")
             self.main_app.config_handler.default_courses = [course for course in courses if course]
+            
+            # 应用字体设置
+            self.main_app.config_handler.font_size = self.font_size.get()
+            self.main_app.config_handler.font_color = self.font_color
             
             self.main_app.config_handler.save_config()
             messagebox.showinfo("成功", "设置已保存")

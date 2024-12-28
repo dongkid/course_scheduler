@@ -77,8 +77,8 @@ class CourseScheduler:
         """创建时间显示区域"""
         self.time_label = tk.Label(
             self.root, 
-            font=("微软雅黑", 16, "bold"),
-            fg="#2c3e50",
+            font=("微软雅黑", self.config_handler.font_size, "bold"),
+            fg=self.config_handler.font_color,
             bg="#ecf0f1"
         )
         self.time_label.pack(pady=15, fill=tk.X)
@@ -92,8 +92,8 @@ class CourseScheduler:
         self.gaokao_label1 = tk.Label(
             self.gaokao_frame,
             text="距离高考",
-            font=("微软雅黑", 12),
-            fg="#2c3e50",
+            font=("微软雅黑", self.config_handler.font_size - 4),
+            fg=self.config_handler.font_color,
             bg="#ecf0f1"
         )
         self.gaokao_label1.pack()
@@ -104,8 +104,8 @@ class CourseScheduler:
         
         self.gaokao_label2 = tk.Label(
             self.gaokao_line2_frame,
-            font=("微软雅黑", 14, "bold"),
-            fg="#2c3e50",
+            font=("微软雅黑", self.config_handler.font_size - 2, "bold"),
+            fg=self.config_handler.font_color,
             bg="#ecf0f1"
         )
         self.gaokao_label2.pack(side=tk.LEFT)
@@ -113,8 +113,8 @@ class CourseScheduler:
         self.gaokao_label3 = tk.Label(
             self.gaokao_line2_frame,
             text="天",
-            font=("微软雅黑", 12),
-            fg="#2c3e50",
+            font=("微软雅黑", self.config_handler.font_size - 4),
+            fg=self.config_handler.font_color,
             bg="#ecf0f1"
         )
         self.gaokao_label3.pack(side=tk.LEFT)
@@ -169,6 +169,9 @@ class CourseScheduler:
             
         weekday = str(now.weekday())
         today_schedule = self.schedule.get(weekday, [])
+        
+        # 过滤掉已销毁的标签
+        self.course_labels = [label for label in self.course_labels if label.winfo_exists()]
         
         self._update_course_labels(now, today_schedule)
         self._remove_extra_labels(today_schedule)
@@ -241,7 +244,8 @@ class CourseScheduler:
         label = tk.Label(
             course_frame,
             text=f"{course['start_time']} {course['name']}",
-            font=("微软雅黑", 12, "bold"),
+            font=("微软雅黑", self.config_handler.font_size - 4, "bold"),
+            fg=self.config_handler.font_color,
             anchor='w'
         )
         label.pack(side=tk.LEFT, fill=tk.X, expand=True)
@@ -269,6 +273,18 @@ class CourseScheduler:
     def _schedule_next_update(self) -> None:
         """安排下一次界面更新"""
         self.root.after(1000, self.update_display)
+    
+    def restart_ui(self) -> None:
+        """重启主界面"""
+        # 清空课程标签列表
+        self.course_labels = []
+        
+        # 销毁现有界面组件
+        for widget in self.root.winfo_children():
+            widget.destroy()
+        
+        # 重新初始化界面
+        self._initialize_ui()
     
     def open_editor(self):
         from editor import EditorWindow
