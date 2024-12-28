@@ -13,7 +13,9 @@ def check_and_generate_files():
             "geometry": DEFAULT_GEOMETRY,
             "gaokao_year": datetime.now().year + 1,
             "course_duration": 40,
-            "auto_start": False
+            "auto_start": False,
+            "font_size": 20,
+            "font_color": "#000000"
         }
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(default_config, f, ensure_ascii=False, indent=2)
