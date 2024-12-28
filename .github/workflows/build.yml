@@ -31,21 +31,21 @@ jobs:
 
     - name: Build 64-bit with Python
       run: |
-        pyinstaller --onefile --name=app_64_py --icon=icon.ico --clean --noconfirm main.py
+        pyinstaller --onefile --name=course_scheduler_64_py --icon=icon.ico --clean --noconfirm main.py
 
     - name: Build 32-bit with Python
       run: |
         set PYTHONARCH=32
-        pyinstaller --onefile --name=app_32_py --icon=icon.ico --clean --noconfirm main.py
+        pyinstaller --onefile --name=course_scheduler_32_py --icon=icon.ico --clean --noconfirm main.py
 
     - name: Build 64-bit without Python
       run: |
-        pyinstaller --onefile --name=app_64_nopy --icon=icon.ico --clean --noconfirm --noconsole main.py
+        pyinstaller --onefile --name=course_scheduler_64_nopy --icon=icon.ico --clean --noconfirm --noconsole main.py
 
     - name: Build 32-bit without Python
       run: |
         set PYTHONARCH=32
-        pyinstaller --onefile --name=app_32_nopy --icon=icon.ico --clean --noconfirm --noconsole main.py
+        pyinstaller --onefile --name=course_scheduler_32_nopy --icon=icon.ico --clean --noconfirm --noconsole main.py
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
@@ -69,10 +69,10 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ github.ref }}
-        name: Release ${{ github.ref }}
+        name: ${{ github.ref_name }}
         generate_release_notes: true
         files: |
-          dist/app_64_py.exe
-          dist/app_32_py.exe
-          dist/app_64_nopy.exe
-          dist/app_32_nopy.exe
+          dist/course_scheduler_64_py.exe
+          dist/course_scheduler_32_py.exe
+          dist/course_scheduler_64_nopy.exe
+          dist/course_scheduler_32_nopy.exe
