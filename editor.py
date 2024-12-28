@@ -49,6 +49,7 @@ class EditorWindow:
             self.window = self._create_window()
             self.day_frames: List[tk.Frame] = []
             self.all_courses = self._get_all_courses()  # 初始化时加载所有课程
+            self.last_course_times = []  # 存储上一次的课程时间
             self._initialize_ui()
         except Exception as e:
             logger.log_error(e)
@@ -87,6 +88,19 @@ class EditorWindow:
         
         # 添加课程
         courses = self.main_app.schedule.get(day, [])
+        
+        # 如果当天没有课程且存在上一次的课程时间，提示是否导入
+        if not courses and self.last_course_times and len(self.last_course_times) > 0:
+            if messagebox.askyesno("导入课程时间", "是否导入上一次的课程时间？"):
+                for course_time in self.last_course_times:
+                    self.add_course_row(frame, len(courses), {
+                        "start_time": course_time["start_time"],
+                        "end_time": course_time["end_time"],
+                        "name": "示例"
+                    })
+                return
+        
+        # 正常添加课程
         for i, course in enumerate(courses):
             self.add_course_row(frame, i, course)
         
@@ -309,6 +323,7 @@ class EditorWindow:
     def save(self):
         try:
             # 保存所有课程
+            self.last_course_times = []  # 清空上一次的课程时间
             for i, day_frame in enumerate(self.day_frames):
                 day_schedule = []
                 for row_frame in day_frame.winfo_children():
@@ -324,6 +339,11 @@ class EditorWindow:
                                     "start_time": start_time,
                                     "end_time": end_time,
                                     "name": name
+                                })
+                                # 保存课程时间
+                                self.last_course_times.append({
+                                    "start_time": start_time,
+                                    "end_time": end_time
                                 })
                 self.main_app.schedule[str(i)] = day_schedule
             
