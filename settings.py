@@ -38,6 +38,28 @@ class SettingsWindow:
         layout_frame = tk.LabelFrame(self.window, text="排版设置")
         layout_frame.grid(row=0, column=0, columnspan=2, padx=10, pady=10, sticky='nsew')
         
+        # 控件大小设置
+        control_size_frame = tk.Frame(layout_frame)
+        control_size_frame.pack(fill='x', pady=5)
+        
+        # 时间显示控件大小
+        tk.Label(control_size_frame, text="时间显示大小:").pack(side=tk.LEFT, padx=5)
+        self.time_display_size = tk.Entry(control_size_frame, width=5)
+        self.time_display_size.pack(side=tk.LEFT, padx=5)
+        self.time_display_size.insert(0, str(self.main_app.config_handler.time_display_size))
+        
+        # 倒计时控件大小
+        tk.Label(control_size_frame, text="倒计时大小:").pack(side=tk.LEFT, padx=5)
+        self.countdown_size = tk.Entry(control_size_frame, width=5)
+        self.countdown_size.pack(side=tk.LEFT, padx=5)
+        self.countdown_size.insert(0, str(self.main_app.config_handler.countdown_size))
+        
+        # 课程表控件大小
+        tk.Label(control_size_frame, text="课程表大小:").pack(side=tk.LEFT, padx=5)
+        self.schedule_size = tk.Entry(control_size_frame, width=5)
+        self.schedule_size.pack(side=tk.LEFT, padx=5)
+        self.schedule_size.insert(0, str(self.main_app.config_handler.schedule_size))
+        
         # 水平间距设置
         tk.Label(layout_frame, text="水平间距:").pack(side=tk.LEFT, padx=5)
         self.horizontal_padding = tk.Entry(layout_frame, width=5)
@@ -331,6 +353,15 @@ class SettingsWindow:
             # 应用默认课表设置
             courses = self.courses_text.get("1.0", tk.END).strip().split("\n")
             self.main_app.config_handler.default_courses = [course for course in courses if course]
+            
+            # 应用控件大小设置
+            try:
+                self.main_app.config_handler.time_display_size = int(self.time_display_size.get())
+                self.main_app.config_handler.countdown_size = int(self.countdown_size.get())
+                self.main_app.config_handler.schedule_size = int(self.schedule_size.get())
+            except ValueError:
+                messagebox.showerror("错误", "请输入有效的控件大小值")
+                return
             
             # 应用字体设置
             self.main_app.config_handler.font_size = self.font_size.get()

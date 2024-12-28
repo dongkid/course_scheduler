@@ -18,6 +18,9 @@ class ConfigHandler:
         self.font_color = "#000000"
         self.horizontal_padding = 10
         self.vertical_padding = 10
+        self.time_display_size = 16
+        self.countdown_size = 14
+        self.schedule_size = 12
 
     def initialize_config(self):
         """加载或初始化配置文件"""
@@ -36,6 +39,9 @@ class ConfigHandler:
                 self.font_color = self.config.get("font_color", "#000000")
                 self.horizontal_padding = self.config.get("horizontal_padding", 10)
                 self.vertical_padding = self.config.get("vertical_padding", 10)
+                self.time_display_size = self.config.get("time_display_size", 20)
+                self.countdown_size = self.config.get("countdown_size", 18)
+                self.schedule_size = self.config.get("schedule_size", 16)
         else:
             self.config = {"geometry": DEFAULT_GEOMETRY}
             self.gaokao_year = datetime.now().year + 1
@@ -68,5 +74,8 @@ class ConfigHandler:
         self.config["font_color"] = self.font_color
         self.config["horizontal_padding"] = self.horizontal_padding
         self.config["vertical_padding"] = self.vertical_padding
+        self.config["time_display_size"] = self.time_display_size
+        self.config["countdown_size"] = self.countdown_size
+        self.config["schedule_size"] = self.schedule_size
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(self.config, f, ensure_ascii=False, indent=2)

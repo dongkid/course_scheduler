@@ -81,7 +81,7 @@ class CourseScheduler:
         """创建时间显示区域"""
         self.time_label = tk.Label(
             self.root, 
-            font=("微软雅黑", self.config_handler.font_size, "bold"),
+            font=("微软雅黑", self.config_handler.time_display_size, "bold"),
             fg=self.config_handler.font_color,
             bg="#ecf0f1"
         )
@@ -96,7 +96,7 @@ class CourseScheduler:
         self.gaokao_label1 = tk.Label(
             self.gaokao_frame,
             text="距离高考",
-            font=("微软雅黑", self.config_handler.font_size - 4),
+            font=("微软雅黑", self.config_handler.countdown_size - 4),
             fg=self.config_handler.font_color,
             bg="#ecf0f1"
         )
@@ -108,7 +108,7 @@ class CourseScheduler:
         
         self.gaokao_label2 = tk.Label(
             self.gaokao_line2_frame,
-            font=("微软雅黑", self.config_handler.font_size - 2, "bold"),
+            font=("微软雅黑", self.config_handler.countdown_size - 2, "bold"),
             fg=self.config_handler.font_color,
             bg="#ecf0f1"
         )
@@ -117,7 +117,7 @@ class CourseScheduler:
         self.gaokao_label3 = tk.Label(
             self.gaokao_line2_frame,
             text="天",
-            font=("微软雅黑", self.config_handler.font_size - 4),
+            font=("微软雅黑", self.config_handler.countdown_size - 4),
             fg=self.config_handler.font_color,
             bg="#ecf0f1"
         )
@@ -250,7 +250,7 @@ class CourseScheduler:
         label = tk.Label(
             course_frame,
             text=f"{course['start_time']} {course['name']}",
-            font=("微软雅黑", self.config_handler.font_size - 4, "bold"),
+            font=("微软雅黑", self.config_handler.schedule_size, "bold"),
             fg=self.config_handler.font_color,
             anchor='w'
         )
