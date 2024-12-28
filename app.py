@@ -5,20 +5,25 @@ import json
 from datetime import datetime, date
 from constants import SCHEDULE_FILE, WEEKDAYS
 from config_handler import ConfigHandler
+from logger import logger
 
 class CourseScheduler:
     """课程表主应用类"""
     def __init__(self):
         """初始化课程表应用"""
-        self.root = self._create_root_window()
-        self.config_handler = ConfigHandler(self.root)
-        self.config_handler.initialize_config()
-        self.schedule: Dict[str, List[Dict[str, str]]] = {}
-        self.course_labels: List[tk.Label] = []
-        self.course_duration = 40 # 默认课程时长为45分钟
-        
-        self._initialize_schedule()
-        self._initialize_ui()
+        try:
+            self.root = self._create_root_window()
+            self.config_handler = ConfigHandler(self.root)
+            self.config_handler.initialize_config()
+            self.schedule: Dict[str, List[Dict[str, str]]] = {}
+            self.course_labels: List[tk.Label] = []
+            self.course_duration = 40 # 默认课程时长为45分钟
+            
+            self._initialize_schedule()
+            self._initialize_ui()
+        except Exception as e:
+            logger.log_error(e)
+            raise
 
     def _create_root_window(self) -> tk.Tk:
         """创建并配置主窗口"""
@@ -134,11 +139,14 @@ class CourseScheduler:
     
     def update_display(self) -> None:
         """更新主界面显示内容"""
-        now = datetime.now()
-        self._update_time_display(now)
-        self._update_countdown_display(now)
-        self._update_schedule_display(now)
-        self._schedule_next_update()
+        try:
+            now = datetime.now()
+            self._update_time_display(now)
+            self._update_countdown_display(now)
+            self._update_schedule_display(now)
+            self._schedule_next_update()
+        except Exception as e:
+            logger.log_error(e)
 
     def _update_time_display(self, now: datetime) -> None:
         """更新时间显示"""

@@ -2,13 +2,18 @@ import tkinter as tk
 from tkinter import messagebox
 from constants import DEFAULT_GEOMETRY, CONFIG_FILE, APP_NAME, AUTHOR, VERSION, PROJECT_URL
 from about_window import AboutWindow
+from logger import logger
 
 class SettingsWindow:
     def __init__(self, main_app):
         """初始化设置窗口"""
-        self.main_app = main_app
-        self.window = self._create_window()
-        self._initialize_ui()
+        try:
+            self.main_app = main_app
+            self.window = self._create_window()
+            self._initialize_ui()
+        except Exception as e:
+            logger.log_error(e)
+            raise
 
     def _create_window(self) -> tk.Toplevel:
         """创建并配置设置窗口"""
@@ -192,72 +197,76 @@ class SettingsWindow:
         self.main_app.config_handler.save_config()
     
     def apply_settings(self):
-        # 应用窗口大小设置
         try:
-            width = int(self.width_entry.get())
-            height = int(self.height_entry.get())
-            if width < 100 or height < 100:
-                raise ValueError
-            x = self.main_app.root.winfo_x()
-            y = self.main_app.root.winfo_y()
-            self.main_app.root.geometry(f"{width}x{height}+{x}+{y}")
-            self.main_app.root.update()
-            self.main_app._adjust_ui_layout()
-            self.main_app.root.update_idletasks()
-            # 更新输入框中的值
-            self.width_entry.delete(0, tk.END)
-            self.width_entry.insert(0, str(width))
-            self.height_entry.delete(0, tk.END)
-            self.height_entry.insert(0, str(height))
-        except:
-            messagebox.showerror("错误", "请输入有效的窗口尺寸")
-            return
-        
-        # 应用高考年份设置
-        try:
-            self.main_app.config_handler.gaokao_year = int(self.gaokao_entry.get())
-        except ValueError:
-            messagebox.showerror("错误", "请输入有效的年份")
-            return
-        
-        # 应用课程时长设置
-        try:
-            duration = int(self.duration_entry.get())
-            if duration <= 0:
-                raise ValueError
-            self.main_app.config_handler.course_duration = duration
-        except ValueError:
-            messagebox.showerror("错误", "请输入有效的课程时长")
-            return
-        
-        # 应用开机自启动设置
-        self.main_app.config_handler.auto_start = self.auto_start_var.get()
-        if self.main_app.config_handler.auto_start:
-            from auto_start import enable_auto_start
-            enable_auto_start("CourseScheduler", sys.executable)
-        else:
-            from auto_start import disable_auto_start
-            disable_auto_start("CourseScheduler")
-        
-        # 应用自动补全结束时间设置
-        self.main_app.config_handler.auto_complete_end_time = self.auto_complete_var.get()
-        
-        # 应用自动计算下一个课程时间设置
-        self.main_app.config_handler.auto_calculate_next_course = self.auto_calculate_var.get()
-        
-        # 应用课间时间设置
-        try:
-            break_duration = int(self.break_duration_entry.get())
-            if break_duration < 0:
-                raise ValueError
-            self.main_app.config_handler.break_duration = break_duration
-        except ValueError:
-            messagebox.showerror("错误", "请输入有效的课间时间")
-            return
-        
-        # 应用默认课表设置
-        courses = self.courses_text.get("1.0", tk.END).strip().split("\n")
-        self.main_app.config_handler.default_courses = [course for course in courses if course]
-        
-        self.main_app.config_handler.save_config()
-        messagebox.showinfo("成功", "设置已保存")
+            # 应用窗口大小设置
+            try:
+                width = int(self.width_entry.get())
+                height = int(self.height_entry.get())
+                if width < 100 or height < 100:
+                    raise ValueError
+                x = self.main_app.root.winfo_x()
+                y = self.main_app.root.winfo_y()
+                self.main_app.root.geometry(f"{width}x{height}+{x}+{y}")
+                self.main_app.root.update()
+                self.main_app._adjust_ui_layout()
+                self.main_app.root.update_idletasks()
+                # 更新输入框中的值
+                self.width_entry.delete(0, tk.END)
+                self.width_entry.insert(0, str(width))
+                self.height_entry.delete(0, tk.END)
+                self.height_entry.insert(0, str(height))
+            except:
+                messagebox.showerror("错误", "请输入有效的窗口尺寸")
+                return
+            
+            # 应用高考年份设置
+            try:
+                self.main_app.config_handler.gaokao_year = int(self.gaokao_entry.get())
+            except ValueError:
+                messagebox.showerror("错误", "请输入有效的年份")
+                return
+            
+            # 应用课程时长设置
+            try:
+                duration = int(self.duration_entry.get())
+                if duration <= 0:
+                    raise ValueError
+                self.main_app.config_handler.course_duration = duration
+            except ValueError:
+                messagebox.showerror("错误", "请输入有效的课程时长")
+                return
+            
+            # 应用开机自启动设置
+            self.main_app.config_handler.auto_start = self.auto_start_var.get()
+            if self.main_app.config_handler.auto_start:
+                from auto_start import enable_auto_start
+                enable_auto_start("CourseScheduler", sys.executable)
+            else:
+                from auto_start import disable_auto_start
+                disable_auto_start("CourseScheduler")
+            
+            # 应用自动补全结束时间设置
+            self.main_app.config_handler.auto_complete_end_time = self.auto_complete_var.get()
+            
+            # 应用自动计算下一个课程时间设置
+            self.main_app.config_handler.auto_calculate_next_course = self.auto_calculate_var.get()
+            
+            # 应用课间时间设置
+            try:
+                break_duration = int(self.break_duration_entry.get())
+                if break_duration < 0:
+                    raise ValueError
+                self.main_app.config_handler.break_duration = break_duration
+            except ValueError:
+                messagebox.showerror("错误", "请输入有效的课间时间")
+                return
+            
+            # 应用默认课表设置
+            courses = self.courses_text.get("1.0", tk.END).strip().split("\n")
+            self.main_app.config_handler.default_courses = [course for course in courses if course]
+            
+            self.main_app.config_handler.save_config()
+            messagebox.showinfo("成功", "设置已保存")
+        except Exception as e:
+            logger.log_error(e)
+            messagebox.showerror("错误", "保存设置时发生错误")

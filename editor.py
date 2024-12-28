@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from constants import WEEKDAYS
 from datetime import datetime, timedelta
+from logger import logger
 
 class TimePicker:
     def __init__(self, parent, initial_time):
@@ -43,11 +44,15 @@ class TimePicker:
 class EditorWindow:
     def __init__(self, main_app):
         """初始化课表编辑窗口"""
-        self.main_app = main_app
-        self.window = self._create_window()
-        self.day_frames: List[tk.Frame] = []
-        self.all_courses = self._get_all_courses()  # 初始化时加载所有课程
-        self._initialize_ui()
+        try:
+            self.main_app = main_app
+            self.window = self._create_window()
+            self.day_frames: List[tk.Frame] = []
+            self.all_courses = self._get_all_courses()  # 初始化时加载所有课程
+            self._initialize_ui()
+        except Exception as e:
+            logger.log_error(e)
+            raise
 
     def _create_window(self) -> tk.Toplevel:
         """创建并配置编辑窗口"""
@@ -302,24 +307,28 @@ class EditorWindow:
         return sorted(all_courses, reverse=True) + filtered_default_courses
     
     def save(self):
-        # 保存所有课程
-        for i, day_frame in enumerate(self.day_frames):
-            day_schedule = []
-            for row_frame in day_frame.winfo_children():
-                if isinstance(row_frame, tk.Frame):
-                    entries = [widget for widget in row_frame.winfo_children() 
-                             if isinstance(widget, tk.Entry)]
-                    if len(entries) >= 3:
-                        start_time = entries[0].get()
-                        end_time = entries[1].get()
-                        name = entries[2].get()
-                        if start_time and end_time and name:
-                            day_schedule.append({
-                                "start_time": start_time,
-                                "end_time": end_time,
-                                "name": name
-                            })
-            self.main_app.schedule[str(i)] = day_schedule
-        
-        self.main_app.save_schedule()
-        messagebox.showinfo("成功", "课表已保存")
+        try:
+            # 保存所有课程
+            for i, day_frame in enumerate(self.day_frames):
+                day_schedule = []
+                for row_frame in day_frame.winfo_children():
+                    if isinstance(row_frame, tk.Frame):
+                        entries = [widget for widget in row_frame.winfo_children() 
+                                 if isinstance(widget, tk.Entry)]
+                        if len(entries) >= 3:
+                            start_time = entries[0].get()
+                            end_time = entries[1].get()
+                            name = entries[2].get()
+                            if start_time and end_time and name:
+                                day_schedule.append({
+                                    "start_time": start_time,
+                                    "end_time": end_time,
+                                    "name": name
+                                })
+                self.main_app.schedule[str(i)] = day_schedule
+            
+            self.main_app.save_schedule()
+            messagebox.showinfo("成功", "课表已保存")
+        except Exception as e:
+            logger.log_error(e)
+            messagebox.showerror("错误", "保存课表时发生错误")
