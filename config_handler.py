@@ -42,6 +42,7 @@ class ConfigHandler:
                 self.time_display_size = self.config.get("time_display_size", 20)
                 self.countdown_size = self.config.get("countdown_size", 18)
                 self.schedule_size = self.config.get("schedule_size", 16)
+                self.transparent_background = self.config.get("transparent_background", False)
         else:
             self.config = {"geometry": DEFAULT_GEOMETRY}
             self.gaokao_year = datetime.now().year + 1
@@ -77,5 +78,6 @@ class ConfigHandler:
         self.config["time_display_size"] = self.time_display_size
         self.config["countdown_size"] = self.countdown_size
         self.config["schedule_size"] = self.schedule_size
+        self.config["transparent_background"] = self.transparent_background
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(self.config, f, ensure_ascii=False, indent=2)

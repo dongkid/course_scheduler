@@ -89,8 +89,8 @@ class SettingsWindow:
         self._create_gaokao_controls(gaokao_frame)
         self._create_default_courses_controls(gaokao_frame)
         
-        # 第五行：字体设置
-        self._create_font_controls()
+        # 第五行：UI与主题设置
+        self._create_ui_theme_controls()
         
         # 第六行：开机自启动
         self._create_auto_start_controls()
@@ -210,10 +210,14 @@ class SettingsWindow:
         
         tk.Label(courses_frame, text="每行一个课程名称").pack()
 
-    def _create_font_controls(self) -> None:
-        """创建字体设置控件"""
-        font_frame = tk.LabelFrame(self.window, text="字体设置")
-        font_frame.grid(row=4, column=0, padx=10, pady=10, sticky='nsew')
+    def _create_ui_theme_controls(self) -> None:
+        """创建UI与主题设置控件"""
+        ui_theme_frame = tk.LabelFrame(self.window, text="UI与主题设置")
+        ui_theme_frame.grid(row=4, column=0, padx=10, pady=10, sticky='nsew')
+        
+        # 字体设置
+        font_frame = tk.Frame(ui_theme_frame)
+        font_frame.pack(fill='x', pady=5)
         
         # 字体大小设置
         tk.Label(font_frame, text="字体大小:").pack(side=tk.LEFT, padx=5)
@@ -232,6 +236,15 @@ class SettingsWindow:
         self.color_preview = tk.Label(font_frame, text="颜色", bg=self.font_color, width=5)
         self.color_preview.pack(side=tk.LEFT, padx=5)
         tk.Button(font_frame, text="选择颜色", command=choose_color).pack(side=tk.LEFT, padx=5)
+        
+        # 透明度设置
+        transparent_frame = tk.Frame(ui_theme_frame)
+        transparent_frame.pack(fill='x', pady=5)
+        self.transparent_var = tk.BooleanVar(value=self.main_app.config_handler.transparent_background)
+        self.transparent_check = tk.Checkbutton(
+            transparent_frame, text="主界面透明度",
+            variable=self.transparent_var)
+        self.transparent_check.pack()
 
     def _create_action_buttons(self) -> None:
         """创建操作按钮"""
@@ -362,6 +375,9 @@ class SettingsWindow:
             except ValueError:
                 messagebox.showerror("错误", "请输入有效的控件大小值")
                 return
+            
+            # 应用透明背景设置
+            self.main_app.config_handler.transparent_background = self.transparent_var.get()
             
             # 应用字体设置
             self.main_app.config_handler.font_size = self.font_size.get()

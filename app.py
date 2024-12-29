@@ -76,6 +76,9 @@ class CourseScheduler:
         self._create_schedule_display()
         self._create_buttons()
         self._update_font_settings()
+        if self.config_handler.transparent_background:
+            self.root.attributes("-transparentcolor", "white")
+            self.root.configure(bg="white")
         self._start_update_loop()
 
     def _create_time_display(self) -> None:
