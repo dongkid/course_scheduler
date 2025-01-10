@@ -50,6 +50,7 @@ class EditorWindow:
             self.day_frames: List[tk.Frame] = []
             self.all_courses = self._get_all_courses()  # 初始化时加载所有课程
             self.last_course_times = []  # 存储上一次的课程时间
+            self.last_edited_day = None  # 存储最后编辑的日期
             self._initialize_ui()
         except Exception as e:
             logger.log_error(e)
@@ -92,12 +93,22 @@ class EditorWindow:
         # 如果当天没有课程且存在上一次的课程时间，提示是否导入
         if not courses and self.last_course_times and len(self.last_course_times) > 0:
             if messagebox.askyesno("导入课程时间", "是否导入上一次的课程时间？"):
+                # 导入时禁用自动补全
+                auto_complete = self.main_app.config_handler.auto_complete_end_time
+                auto_calculate = self.main_app.config_handler.auto_calculate_next_course
+                self.main_app.config_handler.auto_complete_end_time = False
+                self.main_app.config_handler.auto_calculate_next_course = False
+                
                 for course_time in self.last_course_times:
                     self.add_course_row(frame, len(courses), {
                         "start_time": course_time["start_time"],
                         "end_time": course_time["end_time"],
                         "name": "示例"
                     })
+                
+                # 恢复自动补全设置
+                self.main_app.config_handler.auto_complete_end_time = auto_complete
+                self.main_app.config_handler.auto_calculate_next_course = auto_calculate
                 return
         
         # 正常添加课程（禁用自动补全）
@@ -349,12 +360,17 @@ class EditorWindow:
                                     "end_time": end_time,
                                     "name": name
                                 })
-                                # 保存课程时间
-                                self.last_course_times.append({
-                                    "start_time": start_time,
-                                    "end_time": end_time
-                                })
+                                # 如果是最后编辑的日期，保存课程时间
+                                if str(i) == self.last_edited_day:
+                                    self.last_course_times.append({
+                                        "start_time": start_time,
+                                        "end_time": end_time
+                                    })
                 self.main_app.schedule[str(i)] = day_schedule
+            
+            # 更新最后编辑日期为当前日期
+            selected_tab = self.notebook.index(self.notebook.select())
+            self.last_edited_day = str(selected_tab)
             
             self.main_app.save_schedule()
             messagebox.showinfo("成功", "课表已保存")
