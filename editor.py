@@ -100,9 +100,18 @@ class EditorWindow:
                     })
                 return
         
-        # 正常添加课程
+        # 正常添加课程（禁用自动补全）
+        auto_complete = self.main_app.config_handler.auto_complete_end_time
+        auto_calculate = self.main_app.config_handler.auto_calculate_next_course
+        self.main_app.config_handler.auto_complete_end_time = False
+        self.main_app.config_handler.auto_calculate_next_course = False
+        
         for i, course in enumerate(courses):
             self.add_course_row(frame, i, course)
+        
+        # 恢复自动补全设置
+        self.main_app.config_handler.auto_complete_end_time = auto_complete
+        self.main_app.config_handler.auto_calculate_next_course = auto_calculate
         
         # 更新课程名称建议
         self.all_courses = self._get_all_courses()
