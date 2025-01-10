@@ -1,6 +1,6 @@
 import tkinter as tk
 import sys
-from tkinter import messagebox
+from tkinter import messagebox, colorchooser
 from constants import DEFAULT_GEOMETRY, CONFIG_FILE, APP_NAME, AUTHOR, VERSION, PROJECT_URL
 from about_window import AboutWindow
 from logger import logger
