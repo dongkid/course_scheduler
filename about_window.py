@@ -29,13 +29,12 @@ class AboutWindow:
         header_frame.pack(fill=tk.X, pady=(0, 10))
         
         try:
-            try:
-                icon = PhotoImage(file="icon.png")
-                icon_label = tk.Label(header_frame, image=icon)
-                icon_label.image = icon  # 保持引用
-                icon_label.pack(side=tk.LEFT, padx=(0, 20))
-            except Exception as e:
-                print(f"无法加载图标: {e}")
+            icon = PhotoImage(file=sys._MEIPASS + "/icon.png") if hasattr(sys, '_MEIPASS') else PhotoImage(file="icon.png")
+            # 调整图标大小
+            icon = icon.subsample(10, 10)  # 缩小为原来的1/5
+            icon_label = tk.Label(header_frame, image=icon)
+            icon_label.image = icon  # 保持引用
+            icon_label.pack(side=tk.LEFT, padx=(0, 20))
         except Exception as e:
             print(f"无法加载图标: {e}")
         
