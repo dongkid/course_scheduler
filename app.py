@@ -322,10 +322,42 @@ class CourseScheduler:
         # 应用字体设置
         self._adjust_ui_layout()
     
+    def __init__(self):
+        """初始化课程表应用"""
+        try:
+            self.root = self._create_root_window()
+            self.config_handler = ConfigHandler(self.root)
+            self.config_handler.initialize_config()
+            self.schedule: Dict[str, List[Dict[str, str]]] = {}
+            self.course_labels: List[tk.Label] = []
+            self.course_duration = 40 # 默认课程时长为45分钟
+            self.editor_window = None  # 编辑窗口实例
+            self.settings_window = None  # 设置窗口实例
+            self.about_window = None  # 关于窗口实例
+            
+            self._initialize_schedule()
+            self._initialize_ui()
+        except Exception as e:
+            logger.log_error(e)
+            raise
+    
     def open_editor(self):
         from editor import EditorWindow
-        EditorWindow(self)
+        if self.editor_window is None or not self.editor_window.window.winfo_exists():
+            self.editor_window = EditorWindow(self)
+        else:
+            self.editor_window.window.lift()
     
     def open_settings(self):
         from settings import SettingsWindow
-        SettingsWindow(self)
+        if self.settings_window is None or not self.settings_window.window.winfo_exists():
+            self.settings_window = SettingsWindow(self)
+        else:
+            self.settings_window.window.lift()
+    
+    def open_about(self):
+        from about_window import AboutWindow
+        if self.about_window is None or not self.about_window.window.winfo_exists():
+            self.about_window = AboutWindow(self.root)
+        else:
+            self.about_window.window.lift()

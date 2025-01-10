@@ -5,7 +5,19 @@ from pathlib import Path
 class AppLogger:
     def __init__(self):
         self.log_dir = Path("logs")
-        self.log_dir.mkdir(exist_ok=True)
+        try:
+            # 尝试创建日志目录
+            self.log_dir.mkdir(exist_ok=True)
+        except PermissionError:
+            # 如果权限不足，尝试在当前用户目录下创建日志目录
+            self.log_dir = Path.home() / "CourseScheduler_logs"
+            self.log_dir.mkdir(exist_ok=True)
+        except Exception as e:
+            # 如果其他错误，使用临时目录
+            import tempfile
+            self.log_dir = Path(tempfile.gettempdir()) / "CourseScheduler_logs"
+            self.log_dir.mkdir(exist_ok=True)
+        
         self._setup_logger()
 
     def _setup_logger(self):

@@ -1,6 +1,7 @@
 import tkinter as tk
-import webbrowser
-from PIL import Image, ImageTk
+import subprocess
+import sys
+from tkinter import PhotoImage
 from constants import APP_NAME, VERSION, PROJECT_URL
 
 class AboutWindow:
@@ -28,12 +29,13 @@ class AboutWindow:
         header_frame.pack(fill=tk.X, pady=(0, 10))
         
         try:
-            img = Image.open("icon.ico")
-            img = img.resize((48, 48), Image.Resampling.LANCZOS)
-            icon = ImageTk.PhotoImage(img)
-            icon_label = tk.Label(header_frame, image=icon)
-            icon_label.image = icon  # 保持引用
-            icon_label.pack(side=tk.LEFT, padx=(0, 20))
+            try:
+                icon = PhotoImage(file="icon.png")
+                icon_label = tk.Label(header_frame, image=icon)
+                icon_label.image = icon  # 保持引用
+                icon_label.pack(side=tk.LEFT, padx=(0, 20))
+            except Exception as e:
+                print(f"无法加载图标: {e}")
         except Exception as e:
             print(f"无法加载图标: {e}")
         
@@ -60,7 +62,12 @@ class AboutWindow:
         tk.Label(url_frame, text="项目地址:", width=8, anchor=tk.W).pack(side=tk.LEFT)
         
         def open_project_url():
-            webbrowser.open(PROJECT_URL)
+            if sys.platform == 'win32':
+                subprocess.Popen(['start', PROJECT_URL], shell=True)
+            elif sys.platform == 'darwin':
+                subprocess.Popen(['open', PROJECT_URL])
+            else:
+                subprocess.Popen(['xdg-open', PROJECT_URL])
             
         url_label = tk.Label(
             url_frame,
