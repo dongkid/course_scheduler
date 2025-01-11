@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import ttk
 import sys
 from tkinter import messagebox, colorchooser
 from datetime import datetime
@@ -26,126 +27,77 @@ class SettingsWindow:
 
     def _initialize_ui(self) -> None:
         """初始化设置界面"""
-        # 配置网格布局权重
-        self.window.grid_columnconfigure(0, weight=1)
-        self.window.grid_columnconfigure(1, weight=1)
-        self.window.grid_rowconfigure(0, weight=1)
-        self.window.grid_rowconfigure(1, weight=1)
-        self.window.grid_rowconfigure(2, weight=1)
-        self.window.grid_rowconfigure(3, weight=1)
-        self.window.grid_rowconfigure(4, weight=1)
-        self.window.grid_rowconfigure(5, weight=1)
+        # 创建Notebook组件
+        self.notebook = tk.ttk.Notebook(self.window)
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # 第一行：排版设置
-        layout_frame = tk.LabelFrame(self.window, text="排版设置")
-        layout_frame.grid(row=0, column=0, columnspan=2, padx=10, pady=10, sticky='nsew')
+        # 创建各个设置标签页
+        self._create_layout_tab()
+        self._create_window_tab()
+        self._create_course_tab()
+        self._create_theme_tab()
+        self._create_other_tab()
+
+        # 在Notebook下方创建操作按钮
+        button_frame = tk.Frame(self.window)
+        button_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=10)
+        
+        tk.Button(button_frame, text="应用", command=self.apply_settings).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="关于", command=self._show_about).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="重启界面", command=self.restart_ui).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="退出程序", command=self.main_app.root.quit).pack(side=tk.LEFT, padx=5)
+        
+    def _create_layout_tab(self) -> None:
+        """创建排版设置标签页"""
+        layout_frame = tk.Frame(self.notebook)
+        self.notebook.add(layout_frame, text="排版设置")
         
         # 控件大小设置
-        control_size_frame = tk.Frame(layout_frame)
-        control_size_frame.pack(fill='x', pady=5)
+        control_size_frame = tk.LabelFrame(layout_frame, text="控件大小")
+        control_size_frame.pack(fill=tk.X, padx=10, pady=5)
         
         # 时间显示控件大小
-        tk.Label(control_size_frame, text="时间显示大小:").pack(side=tk.LEFT, padx=5)
+        tk.Label(control_size_frame, text="时间显示大小:").grid(row=0, column=0, padx=5, pady=5)
         self.time_display_size = tk.Entry(control_size_frame, width=5)
-        self.time_display_size.pack(side=tk.LEFT, padx=5)
+        self.time_display_size.grid(row=0, column=1, padx=5, pady=5)
         self.time_display_size.insert(0, str(self.main_app.config_handler.time_display_size))
         
         # 倒计时控件大小
-        tk.Label(control_size_frame, text="倒计时大小:").pack(side=tk.LEFT, padx=5)
+        tk.Label(control_size_frame, text="倒计时大小:").grid(row=1, column=0, padx=5, pady=5)
         self.countdown_size = tk.Entry(control_size_frame, width=5)
-        self.countdown_size.pack(side=tk.LEFT, padx=5)
+        self.countdown_size.grid(row=1, column=1, padx=5, pady=5)
         self.countdown_size.insert(0, str(self.main_app.config_handler.countdown_size))
         
         # 课程表控件大小
-        tk.Label(control_size_frame, text="课程表大小:").pack(side=tk.LEFT, padx=5)
+        tk.Label(control_size_frame, text="课程表大小:").grid(row=2, column=0, padx=5, pady=5)
         self.schedule_size = tk.Entry(control_size_frame, width=5)
-        self.schedule_size.pack(side=tk.LEFT, padx=5)
+        self.schedule_size.grid(row=2, column=1, padx=5, pady=5)
         self.schedule_size.insert(0, str(self.main_app.config_handler.schedule_size))
         
+        # 间距设置
+        padding_frame = tk.LabelFrame(layout_frame, text="间距设置")
+        padding_frame.pack(fill=tk.X, padx=10, pady=5)
+        
         # 水平间距设置
-        tk.Label(layout_frame, text="水平间距:").pack(side=tk.LEFT, padx=5)
-        self.horizontal_padding = tk.Entry(layout_frame, width=5)
-        self.horizontal_padding.pack(side=tk.LEFT, padx=5)
+        tk.Label(padding_frame, text="水平间距:").grid(row=0, column=0, padx=5, pady=5)
+        self.horizontal_padding = tk.Entry(padding_frame, width=5)
+        self.horizontal_padding.grid(row=0, column=1, padx=5, pady=5)
         self.horizontal_padding.insert(0, str(self.main_app.config_handler.horizontal_padding))
         
         # 垂直间距设置
-        tk.Label(layout_frame, text="垂直间距:").pack(side=tk.LEFT, padx=5)
-        self.vertical_padding = tk.Entry(layout_frame, width=5)
-        self.vertical_padding.pack(side=tk.LEFT, padx=5)
+        tk.Label(padding_frame, text="垂直间距:").grid(row=1, column=0, padx=5, pady=5)
+        self.vertical_padding = tk.Entry(padding_frame, width=5)
+        self.vertical_padding.grid(row=1, column=1, padx=5, pady=5)
         self.vertical_padding.insert(0, str(self.main_app.config_handler.vertical_padding))
 
-        # 第二行：窗口控制
-        control_frame = tk.LabelFrame(self.window, text="窗口控制")
-        control_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=10, sticky='nsew')
-        self._create_position_controls(control_frame)
-        self._create_size_controls(control_frame)
+    def _create_window_tab(self) -> None:
+        """创建窗口控制标签页"""
+        window_frame = tk.Frame(self.notebook)
+        self.notebook.add(window_frame, text="窗口控制")
         
-        # 第三行：课程设置
-        course_frame = tk.LabelFrame(self.window, text="课程设置")
-        course_frame.grid(row=2, column=0, columnspan=2, padx=10, pady=10, sticky='nsew')
-        self._create_course_duration_controls(course_frame)
-        
-        # 第四行：倒计时与默认课表
-        gaokao_frame = tk.LabelFrame(self.window, text="倒计时与默认课表")
-        gaokao_frame.grid(row=3, column=0, padx=10, pady=10, sticky='nsew')
-        self._create_gaokao_controls(gaokao_frame)
-        self._create_default_courses_controls(gaokao_frame)
-        
-        # 第五行：UI与主题设置
-        self._create_ui_theme_controls()
-        
-        # 第六行：开机自启动
-        self._create_auto_start_controls()
-        
-        # 底部：操作按钮
-        self._create_action_buttons()
-
-    def _create_auto_start_controls(self) -> None:
-        """创建开机自启动设置"""
-        auto_start_frame = tk.LabelFrame(self.window, text="开机自启动")
-        auto_start_frame.grid(row=4, column=1, padx=15, pady=15, sticky='nsew')
-        
-        self.auto_start_var = tk.BooleanVar(value=self.main_app.config_handler.auto_start)
-        self.auto_start_check = tk.Checkbutton(
-            auto_start_frame, text="开机时自动启动程序",
-            variable=self.auto_start_var)
-        self.auto_start_check.pack(side=tk.LEFT, padx=5)
-
-    def _create_course_duration_controls(self, parent) -> None:
-        """创建课程时长设置"""
-        duration_frame = tk.LabelFrame(parent, text="课程时长设置")
-        duration_frame.pack(fill='both', expand=True, padx=5, pady=5)
-        
-        # 课程时长设置
-        tk.Label(duration_frame, text="课程时长（分钟）:").pack(side=tk.LEFT)
-        self.duration_entry = tk.Entry(duration_frame, width=5)
-        self.duration_entry.pack(side=tk.LEFT, padx=2)
-        self.duration_entry.insert(0, str(self.main_app.config_handler.course_duration))
-
-        # 自动补全结束时间
-        self.auto_complete_var = tk.BooleanVar(value=self.main_app.config_handler.auto_complete_end_time)
-        self.auto_complete_check = tk.Checkbutton(
-            duration_frame, text="自动补全结束时间",
-            variable=self.auto_complete_var)
-        self.auto_complete_check.pack(side=tk.LEFT, padx=5)
-
-        # 自动计算下一个课程时间
-        self.auto_calculate_var = tk.BooleanVar(value=self.main_app.config_handler.auto_calculate_next_course)
-        self.auto_calculate_check = tk.Checkbutton(
-            duration_frame, text="自动计算下一个课程时间",
-            variable=self.auto_calculate_var)
-        self.auto_calculate_check.pack(side=tk.LEFT, padx=5)
-
-        # 课间时间设置
-        tk.Label(duration_frame, text="课间时间（分钟）:").pack(side=tk.LEFT)
-        self.break_duration_entry = tk.Entry(duration_frame, width=5)
-        self.break_duration_entry.pack(side=tk.LEFT, padx=2)
-        self.break_duration_entry.insert(0, str(self.main_app.config_handler.break_duration))
-
-    def _create_position_controls(self, parent) -> None:
-        """创建窗口位置控制"""
-        pos_frame = tk.LabelFrame(parent, text="窗口位置")
-        pos_frame.pack(fill='both', expand=True, padx=5, pady=5)
+        # 窗口位置控制
+        pos_frame = tk.LabelFrame(window_frame, text="窗口位置")
+        pos_frame.pack(fill=tk.X, padx=10, pady=5)
         
         def create_button(frame, text, dx, dy):
             button = tk.Button(frame, text=text, width=5, height=2)
@@ -153,7 +105,6 @@ class SettingsWindow:
             
             def start_move():
                 self.move_window(dx, dy)
-                # 初始延迟100ms，每次减少5ms，最小延迟20ms
                 current_delay = getattr(button, 'current_delay', 100)
                 new_delay = max(10, current_delay - 5)
                 button.current_delay = new_delay
@@ -163,7 +114,6 @@ class SettingsWindow:
                 if hasattr(button, 'after_id'):
                     button.after_cancel(button.after_id)
                     del button.after_id
-                # 重置延迟时间
                 if hasattr(button, 'current_delay'):
                     del button.current_delay
             
@@ -176,42 +126,75 @@ class SettingsWindow:
         create_button(pos_frame, "↑", 0, -10)
         create_button(pos_frame, "↓", 0, 10)
 
-    def _create_size_controls(self, parent) -> None:
-        """创建窗口大小控制"""
-        size_frame = tk.LabelFrame(parent, text="窗口大小")
-        size_frame.pack(fill='both', expand=True, padx=5, pady=5)
+        # 窗口大小控制
+        size_frame = tk.LabelFrame(window_frame, text="窗口大小")
+        size_frame.pack(fill=tk.X, padx=10, pady=5)
         
-        tk.Label(size_frame, text="宽度:").pack(side=tk.LEFT)
+        tk.Label(size_frame, text="宽度:").grid(row=0, column=0, padx=5, pady=5)
         self.width_entry = tk.Entry(size_frame, width=5)
-        self.width_entry.pack(side=tk.LEFT, padx=2)
+        self.width_entry.grid(row=0, column=1, padx=5, pady=5)
         self.width_entry.insert(0, self.main_app.root.winfo_width())
         
-        tk.Label(size_frame, text="高度:").pack(side=tk.LEFT)
+        tk.Label(size_frame, text="高度:").grid(row=1, column=0, padx=5, pady=5)
         self.height_entry = tk.Entry(size_frame, width=5)
-        self.height_entry.pack(side=tk.LEFT, padx=2)
+        self.height_entry.grid(row=1, column=1, padx=5, pady=5)
         self.height_entry.insert(0, self.main_app.root.winfo_height())
 
-    def _create_gaokao_controls(self, parent) -> None:
-        """创建倒计时设置控制"""
-        countdown_frame = tk.LabelFrame(parent, text="倒计时设置")
-        countdown_frame.pack(fill='both', expand=True, padx=5, pady=5)
+    def _create_course_tab(self) -> None:
+        """创建课程设置标签页"""
+        course_frame = tk.Frame(self.notebook)
+        self.notebook.add(course_frame, text="课程设置")
         
-        # 倒计时名称设置
-        tk.Label(countdown_frame, text="倒计时名称:").pack(side=tk.LEFT, padx=5)
+        # 课程时长设置
+        duration_frame = tk.LabelFrame(course_frame, text="课程时长设置")
+        duration_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        tk.Label(duration_frame, text="课程时长（分钟）:").grid(row=0, column=0, padx=5, pady=5)
+        self.duration_entry = tk.Entry(duration_frame, width=5)
+        self.duration_entry.grid(row=0, column=1, padx=5, pady=5)
+        self.duration_entry.insert(0, str(self.main_app.config_handler.course_duration))
+        
+        # 自动补全结束时间
+        self.auto_complete_var = tk.BooleanVar(value=self.main_app.config_handler.auto_complete_end_time)
+        self.auto_complete_check = tk.Checkbutton(
+            duration_frame, text="自动补全结束时间",
+            variable=self.auto_complete_var)
+        self.auto_complete_check.grid(row=1, column=0, columnspan=2, padx=5, pady=5)
+        
+        # 自动计算下一个课程时间
+        self.auto_calculate_var = tk.BooleanVar(value=self.main_app.config_handler.auto_calculate_next_course)
+        self.auto_calculate_check = tk.Checkbutton(
+            duration_frame, text="自动计算下一个课程时间",
+            variable=self.auto_calculate_var)
+        self.auto_calculate_check.grid(row=2, column=0, columnspan=2, padx=5, pady=5)
+        
+        # 课间时间设置
+        tk.Label(duration_frame, text="课间时间（分钟）:").grid(row=3, column=0, padx=5, pady=5)
+        self.break_duration_entry = tk.Entry(duration_frame, width=5)
+        self.break_duration_entry.grid(row=3, column=1, padx=5, pady=5)
+        self.break_duration_entry.insert(0, str(self.main_app.config_handler.break_duration))
+
+        # 倒计时与默认课表设置
+        gaokao_frame = tk.LabelFrame(course_frame, text="倒计时与默认课表")
+        gaokao_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        # 倒计时设置
+        countdown_frame = tk.LabelFrame(gaokao_frame, text="倒计时设置")
+        countdown_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        tk.Label(countdown_frame, text="倒计时名称:").grid(row=0, column=0, padx=5, pady=5)
         self.countdown_name_entry = tk.Entry(countdown_frame, width=10)
-        self.countdown_name_entry.pack(side=tk.LEFT, padx=5)
+        self.countdown_name_entry.grid(row=0, column=1, padx=5, pady=5)
         self.countdown_name_entry.insert(0, self.main_app.config_handler.countdown_name)
         
-        # 倒计时日期设置
-        tk.Label(countdown_frame, text="倒计时日期:").pack(side=tk.LEFT, padx=5)
+        tk.Label(countdown_frame, text="倒计时日期:").grid(row=1, column=0, padx=5, pady=5)
         self.countdown_date_entry = tk.Entry(countdown_frame, width=10)
-        self.countdown_date_entry.pack(side=tk.LEFT, padx=5)
+        self.countdown_date_entry.grid(row=1, column=1, padx=5, pady=5)
         self.countdown_date_entry.insert(0, self.main_app.config_handler.countdown_date.strftime("%Y-%m-%d"))
 
-    def _create_default_courses_controls(self, parent) -> None:
-        """创建默认课表设置"""
-        courses_frame = tk.LabelFrame(parent, text="默认课表设置")
-        courses_frame.pack(fill='both', expand=True, padx=5, pady=5)
+        # 默认课表设置
+        courses_frame = tk.LabelFrame(gaokao_frame, text="默认课表设置")
+        courses_frame.pack(fill=tk.X, padx=5, pady=5)
         
         self.courses_text = tk.Text(courses_frame, height=5, width=30)
         self.courses_text.pack(padx=5, pady=5)
@@ -219,20 +202,20 @@ class SettingsWindow:
         
         tk.Label(courses_frame, text="每行一个课程名称").pack()
 
-    def _create_ui_theme_controls(self) -> None:
-        """创建UI与主题设置控件"""
-        ui_theme_frame = tk.LabelFrame(self.window, text="UI与主题设置")
-        ui_theme_frame.grid(row=4, column=0, padx=10, pady=10, sticky='nsew')
+    def _create_theme_tab(self) -> None:
+        """创建主题设置标签页"""
+        theme_frame = tk.Frame(self.notebook)
+        self.notebook.add(theme_frame, text="主题设置")
         
         # 字体设置
-        font_frame = tk.Frame(ui_theme_frame)
-        font_frame.pack(fill='x', pady=5)
+        font_frame = tk.LabelFrame(theme_frame, text="字体设置")
+        font_frame.pack(fill=tk.X, padx=10, pady=5)
         
         # 字体大小设置
-        tk.Label(font_frame, text="字体大小:").pack(side=tk.LEFT, padx=5)
+        tk.Label(font_frame, text="字体大小:").grid(row=0, column=0, padx=5, pady=5)
         self.font_size = tk.Scale(font_frame, from_=8, to=32, orient=tk.HORIZONTAL)
         self.font_size.set(self.main_app.config_handler.font_size)
-        self.font_size.pack(side=tk.LEFT, padx=5)
+        self.font_size.grid(row=0, column=1, padx=5, pady=5)
         
         # 字体颜色设置
         def choose_color():
@@ -243,27 +226,35 @@ class SettingsWindow:
         
         self.font_color = self.main_app.config_handler.font_color
         self.color_preview = tk.Label(font_frame, text="颜色", bg=self.font_color, width=5)
-        self.color_preview.pack(side=tk.LEFT, padx=5)
-        tk.Button(font_frame, text="选择颜色", command=choose_color).pack(side=tk.LEFT, padx=5)
+        self.color_preview.grid(row=1, column=0, padx=5, pady=5)
+        tk.Button(font_frame, text="选择颜色", command=choose_color).grid(row=1, column=1, padx=5, pady=5)
         
         # 透明度设置
-        transparent_frame = tk.Frame(ui_theme_frame)
-        transparent_frame.pack(fill='x', pady=5)
+        transparent_frame = tk.LabelFrame(theme_frame, text="透明度设置")
+        transparent_frame.pack(fill=tk.X, padx=10, pady=5)
+        
         self.transparent_var = tk.BooleanVar(value=self.main_app.config_handler.transparent_background)
         self.transparent_check = tk.Checkbutton(
             transparent_frame, text="主界面透明度",
             variable=self.transparent_var)
         self.transparent_check.pack()
 
-    def _create_action_buttons(self) -> None:
-        """创建操作按钮"""
-        button_frame = tk.Frame(self.window)
-        button_frame.grid(row=5, column=0, columnspan=2, pady=20, padx=15)
+    def _create_other_tab(self) -> None:
+        """创建其他设置标签页"""
+        other_frame = tk.Frame(self.notebook)
+        self.notebook.add(other_frame, text="其他设置")
         
-        tk.Button(button_frame, text="应用", command=self.apply_settings).pack(side=tk.LEFT, padx=5)
-        tk.Button(button_frame, text="关于", command=self._show_about).pack(side=tk.LEFT, padx=5)
-        tk.Button(button_frame, text="重启界面", command=self.restart_ui).pack(side=tk.LEFT, padx=5)
-        tk.Button(button_frame, text="退出程序", command=self.main_app.root.quit).pack(side=tk.LEFT, padx=5)
+        # 开机自启动设置
+        auto_start_frame = tk.LabelFrame(other_frame, text="开机自启动")
+        auto_start_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        self.auto_start_var = tk.BooleanVar(value=self.main_app.config_handler.auto_start)
+        self.auto_start_check = tk.Checkbutton(
+            auto_start_frame, text="开机时自动启动程序",
+            variable=self.auto_start_var)
+        self.auto_start_check.pack(side=tk.LEFT, padx=5)
+
+
 
     def restart_ui(self) -> None:
         """重启主界面"""
