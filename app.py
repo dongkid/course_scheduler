@@ -92,40 +92,40 @@ class CourseScheduler:
         self.time_label.pack(pady=self.config_handler.vertical_padding, fill=tk.X)
 
     def _create_countdown_display(self) -> None:
-        """创建高考倒计时显示区域"""
-        self.gaokao_frame = tk.Frame(self.root)
-        self.gaokao_frame.pack(pady=self.config_handler.vertical_padding)
+        """创建倒计时显示区域"""
+        self.countdown_frame = tk.Frame(self.root)
+        self.countdown_frame.pack(pady=self.config_handler.vertical_padding)
         
-        # 第一行：显示"距离高考"
-        self.gaokao_label1 = tk.Label(
-            self.gaokao_frame,
-            text="距离高考",
+        # 第一行：显示自定义倒计时名称
+        self.countdown_label1 = tk.Label(
+            self.countdown_frame,
+            text=f"距离{self.config_handler.countdown_name}",
             font=("微软雅黑", self.config_handler.countdown_size - 4),
             fg=self.config_handler.font_color,
             bg="#ecf0f1"
         )
-        self.gaokao_label1.pack()
+        self.countdown_label1.pack()
         
         # 第二行：显示天数和"天"字
-        self.gaokao_line2_frame = tk.Frame(self.gaokao_frame)
-        self.gaokao_line2_frame.pack()
+        self.countdown_line2_frame = tk.Frame(self.countdown_frame)
+        self.countdown_line2_frame.pack()
         
-        self.gaokao_label2 = tk.Label(
-            self.gaokao_line2_frame,
+        self.countdown_label2 = tk.Label(
+            self.countdown_line2_frame,
             font=("微软雅黑", self.config_handler.countdown_size - 2, "bold"),
             fg=self.config_handler.font_color,
             bg="#ecf0f1"
         )
-        self.gaokao_label2.pack(side=tk.LEFT)
+        self.countdown_label2.pack(side=tk.LEFT)
         
-        self.gaokao_label3 = tk.Label(
-            self.gaokao_line2_frame,
+        self.countdown_label3 = tk.Label(
+            self.countdown_line2_frame,
             text="天",
             font=("微软雅黑", self.config_handler.countdown_size - 4),
             fg=self.config_handler.font_color,
             bg="#ecf0f1"
         )
-        self.gaokao_label3.pack(side=tk.LEFT)
+        self.countdown_label3.pack(side=tk.LEFT)
 
     def _create_schedule_display(self) -> None:
         """创建课程表显示区域"""
@@ -167,10 +167,9 @@ class CourseScheduler:
         )
 
     def _update_countdown_display(self, now: datetime) -> None:
-        """更新高考倒计时显示"""
-        gaokao_date = date(self.config_handler.gaokao_year, 6, 7)
-        delta = (gaokao_date - now.date()).days
-        self.gaokao_label2.config(text=str(delta))
+        """更新倒计时显示"""
+        delta = (self.config_handler.countdown_date.date() - now.date()).days
+        self.countdown_label2.config(text=str(delta))
 
     def _update_schedule_display(self, now: datetime) -> None:
         """更新课程表显示"""
@@ -225,16 +224,16 @@ class CourseScheduler:
             fg=self.config_handler.font_color
         )
         
-        # 更新高考倒计时显示
-        self.gaokao_label1.config(
+        # 更新倒计时显示
+        self.countdown_label1.config(
             font=("微软雅黑", self.config_handler.font_size - 4),
             fg=self.config_handler.font_color
         )
-        self.gaokao_label2.config(
+        self.countdown_label2.config(
             font=("微软雅黑", self.config_handler.font_size - 2, "bold"),
             fg=self.config_handler.font_color
         )
-        self.gaokao_label3.config(
+        self.countdown_label3.config(
             font=("微软雅黑", self.config_handler.font_size - 4),
             fg=self.config_handler.font_color
         )

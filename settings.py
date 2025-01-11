@@ -1,6 +1,7 @@
 import tkinter as tk
 import sys
 from tkinter import messagebox, colorchooser
+from datetime import datetime
 from constants import DEFAULT_GEOMETRY, CONFIG_FILE, APP_NAME, AUTHOR, VERSION, PROJECT_URL
 from about_window import AboutWindow
 from logger import logger
@@ -191,14 +192,21 @@ class SettingsWindow:
         self.height_entry.insert(0, self.main_app.root.winfo_height())
 
     def _create_gaokao_controls(self, parent) -> None:
-        """创建高考设置控制"""
-        gaokao_frame = tk.LabelFrame(parent, text="高考设置")
-        gaokao_frame.pack(fill='both', expand=True, padx=5, pady=5)
+        """创建倒计时设置控制"""
+        countdown_frame = tk.LabelFrame(parent, text="倒计时设置")
+        countdown_frame.pack(fill='both', expand=True, padx=5, pady=5)
         
-        tk.Label(gaokao_frame, text="高考年份:").pack(side=tk.LEFT, padx=5)
-        self.gaokao_entry = tk.Entry(gaokao_frame, width=10)
-        self.gaokao_entry.pack(side=tk.LEFT, padx=5)
-        self.gaokao_entry.insert(0, str(self.main_app.config_handler.gaokao_year))
+        # 倒计时名称设置
+        tk.Label(countdown_frame, text="倒计时名称:").pack(side=tk.LEFT, padx=5)
+        self.countdown_name_entry = tk.Entry(countdown_frame, width=10)
+        self.countdown_name_entry.pack(side=tk.LEFT, padx=5)
+        self.countdown_name_entry.insert(0, self.main_app.config_handler.countdown_name)
+        
+        # 倒计时日期设置
+        tk.Label(countdown_frame, text="倒计时日期:").pack(side=tk.LEFT, padx=5)
+        self.countdown_date_entry = tk.Entry(countdown_frame, width=10)
+        self.countdown_date_entry.pack(side=tk.LEFT, padx=5)
+        self.countdown_date_entry.insert(0, self.main_app.config_handler.countdown_date.strftime("%Y-%m-%d"))
 
     def _create_default_courses_controls(self, parent) -> None:
         """创建默认课表设置"""
@@ -322,11 +330,16 @@ class SettingsWindow:
                 messagebox.showerror("错误", "请输入有效的窗口尺寸")
                 return
             
-            # 应用高考年份设置
+            # 应用倒计时设置
             try:
-                self.main_app.config_handler.gaokao_year = int(self.gaokao_entry.get())
+                self.main_app.config_handler.countdown_name = self.countdown_name_entry.get()
+                countdown_date = datetime.strptime(self.countdown_date_entry.get(), "%Y-%m-%d")
+                if countdown_date < datetime.now():
+                    messagebox.showerror("错误", "倒计时日期不能是过去的时间")
+                    return
+                self.main_app.config_handler.countdown_date = countdown_date
             except ValueError:
-                messagebox.showerror("错误", "请输入有效的年份")
+                messagebox.showerror("错误", "请输入有效的日期格式 (YYYY-MM-DD)")
                 return
             
             # 应用课程时长设置

@@ -7,7 +7,8 @@ class ConfigHandler:
     def __init__(self, root_window):
         self.root = root_window
         self.config = {}
-        self.gaokao_year = datetime.now().year + 1
+        self.countdown_name = "高考"
+        self.countdown_date = datetime(datetime.now().year + 1, 6, 7)
         self.course_duration = 40
         self.auto_start = False
         self.auto_complete_end_time = True
@@ -28,7 +29,11 @@ class ConfigHandler:
             with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
                 self.config = json.load(f)
                 self.root.geometry(self.config["geometry"])
-                self.gaokao_year = self.config.get("gaokao_year", datetime.now().year + 1)
+                self.countdown_name = self.config.get("countdown_name", "高考")
+                self.countdown_date = datetime.strptime(
+                    self.config.get("countdown_date", f"{datetime.now().year + 1}-06-07"),
+                    "%Y-%m-%d"
+                )
                 self.course_duration = self.config.get("course_duration", 40)
                 self.auto_start = self.config.get("auto_start", False)
                 self.auto_complete_end_time = self.config.get("auto_complete_end_time", True)
@@ -45,7 +50,8 @@ class ConfigHandler:
                 self.transparent_background = self.config.get("transparent_background", False)
         else:
             self.config = {"geometry": DEFAULT_GEOMETRY}
-            self.gaokao_year = datetime.now().year + 1
+            self.countdown_name = "高考"
+            self.countdown_date = datetime(datetime.now().year + 1, 6, 7)
             self.course_duration = 40
             self.save_config()
 
@@ -64,7 +70,8 @@ class ConfigHandler:
     def save_config(self):
         """保存当前配置到文件"""
         self.config["geometry"] = self.root.geometry()
-        self.config["gaokao_year"] = self.gaokao_year
+        self.config["countdown_name"] = self.countdown_name
+        self.config["countdown_date"] = self.countdown_date.strftime("%Y-%m-%d")
         self.config["course_duration"] = self.course_duration
         self.config["auto_start"] = self.auto_start
         self.config["auto_complete_end_time"] = self.auto_complete_end_time

@@ -1,4 +1,5 @@
 import tkinter as tk
+import time
 from tkinter import ttk, messagebox
 from constants import WEEKDAYS
 from datetime import datetime, timedelta
@@ -64,6 +65,10 @@ class EditorWindow:
 
     def _initialize_ui(self) -> None:
         """初始化编辑界面"""
+        # 初始化缓存
+        self._ui_cache = {}
+        self._last_suggestions = set()
+        
         self._create_notebook()
         self._create_save_button()
 
@@ -72,10 +77,19 @@ class EditorWindow:
         self.notebook = tk.ttk.Notebook(self.window)
         self.notebook.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
         
+        # 预创建所有标签页
         for i in range(7):
             day_frame = tk.Frame(self.notebook)
             self.day_frames.append(day_frame)
             self.notebook.add(day_frame, text=f"星期{WEEKDAYS[i]}")
+            
+            # 初始化缓存
+            self._ui_cache[str(i)] = {
+                'courses': [],
+                'last_update': 0
+            }
+            
+            # 直接加载UI
             self.create_day_ui(day_frame, str(i))
 
     def _create_save_button(self) -> None:
@@ -317,12 +331,22 @@ class EditorWindow:
         """根据用户输入更新课程名称建议"""
         current_text = combobox.get()
         if not current_text:
-            combobox['values'] = list(self._get_all_courses())
+            # 使用缓存数据
+            if not self._last_suggestions:
+                self._last_suggestions = set(self._get_all_courses())
+            combobox['values'] = list(self._last_suggestions)
             return
         
-        suggestions = [course for course in self._get_all_courses() 
+        # 仅在输入变化时更新建议
+        suggestions = [course for course in self._last_suggestions 
                       if current_text.lower() in course.lower()]
-        combobox['values'] = suggestions
+        if suggestions:
+            combobox['values'] = suggestions
+        else:
+            # 重新获取所有课程
+            self._last_suggestions = set(self._get_all_courses())
+            combobox['values'] = [course for course in self._last_suggestions 
+                                if current_text.lower() in course.lower()]
     
     def _get_all_courses(self):
         """获取所有历史课程名称"""
