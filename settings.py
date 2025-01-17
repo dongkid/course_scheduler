@@ -43,9 +43,6 @@ class SettingsWindow:
         button_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=10)
         
         tk.Button(button_frame, text="应用", command=self.apply_settings).pack(side=tk.LEFT, padx=5)
-        tk.Button(button_frame, text="关于", command=self._show_about).pack(side=tk.LEFT, padx=5)
-        tk.Button(button_frame, text="重启界面", command=self.restart_ui).pack(side=tk.LEFT, padx=5)
-        tk.Button(button_frame, text="退出程序", command=self.main_app.root.quit).pack(side=tk.LEFT, padx=5)
         
     def _create_layout_tab(self) -> None:
         """创建排版设置标签页"""

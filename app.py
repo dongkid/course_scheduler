@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Callable
 import tkinter as tk
 import os
 import json
@@ -6,7 +6,7 @@ from datetime import datetime, date
 from constants import SCHEDULE_FILE, WEEKDAYS
 from config_handler import ConfigHandler
 from logger import logger
-
+from main_menu import MainMenu
 class CourseScheduler:
     """课程表主应用类"""
     def __init__(self):
@@ -18,6 +18,8 @@ class CourseScheduler:
             self.schedule: Dict[str, List[Dict[str, str]]] = {}
             self.course_labels: List[tk.Label] = []
             self.course_duration = 40 # 默认课程时长为45分钟
+            
+            self._initialize_schedule()
             
             self._initialize_schedule()
             self._initialize_ui()
@@ -139,8 +141,21 @@ class CourseScheduler:
         button_frame = tk.Frame(self.root)
         button_frame.pack(pady=self.config_handler.vertical_padding)
         
-        tk.Button(button_frame, text="编辑课表", command=self.open_editor).pack(side=tk.LEFT, padx=5)
-        tk.Button(button_frame, text="设置", command=self.open_settings).pack(side=tk.LEFT, padx=5)
+        # 添加主菜单按钮
+        tk.Button(button_frame, text="主菜单", command=self.show_main_menu).pack(side=tk.LEFT, padx=5)
+        
+        # 初始化主菜单
+        self.main_menu = MainMenu(
+            self.root,
+                {
+                    "编辑课表": self.open_editor,
+                    "设置": self.open_settings,
+                    "关于": self.open_about,
+                    "重启主界面": self.restart_ui,
+                    "退出程序": self.root.quit,
+                    "小工具（待开发）": lambda: None
+                }
+        )
 
     def _start_update_loop(self) -> None:
         """启动界面更新循环"""
@@ -333,12 +348,28 @@ class CourseScheduler:
             self.editor_window = None  # 编辑窗口实例
             self.settings_window = None  # 设置窗口实例
             self.about_window = None  # 关于窗口实例
+            self.main_menu = None  # 主菜单实例
             
             self._initialize_schedule()
             self._initialize_ui()
         except Exception as e:
             logger.log_error(e)
             raise
+
+    def show_main_menu(self) -> None:
+        """显示主菜单"""
+        if self.main_menu is None:
+            self.main_menu = MainMenu(
+                self.root,
+                {
+                    "编辑课表": self.open_editor,
+                    "设置": self.open_settings,
+                    "关于": self.open_about,
+                    "重启主界面": self.restart_ui,
+                    "小工具（待开发）": lambda: None
+                }
+            )
+        self.main_menu.show()
     
     def open_editor(self):
         from editor import EditorWindow
