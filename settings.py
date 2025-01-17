@@ -31,6 +31,15 @@ class SettingsWindow:
         self.style.configure("TFrame", background="white")
         self.style.configure("TLabel", background="white", 
                            font=("微软雅黑", 14))
+        self.style.configure("TNotebook", background="white")
+        self.style.configure("TNotebook.Tab", background="white", padding=[10, 5])
+        # 定义白色风格的Checkbutton
+        self.style.configure("White.TCheckbutton",
+                           background="white",
+                           font=("微软雅黑", 12))
+        self.style.map("White.TCheckbutton",
+                      background=[("active", "white")],
+                      foreground=[("active", "black")])
         self.style.configure("Title.TLabel", font=("微软雅黑", 24, "bold"),
                            foreground="#2c3e50")
         self.style.configure("Subtitle.TLabel", font=("微软雅黑", 14),
@@ -46,7 +55,7 @@ class SettingsWindow:
     def _initialize_ui(self) -> None:
         """初始化设置界面"""
         # 主容器
-        main_frame = ttk.Frame(self.window)
+        main_frame = ttk.Frame(self.window, style="TFrame")
         main_frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=20)
         
         # 添加标题
@@ -69,8 +78,11 @@ class SettingsWindow:
         subtitle_label.pack(pady=(0, 20))
         
         # 创建Notebook组件
-        self.notebook = ttk.Notebook(main_frame)
+        self.notebook = ttk.Notebook(main_frame, style="TNotebook")
         self.notebook.pack(fill=tk.BOTH, expand=True)
+        # 设置Notebook内部Frame的背景颜色
+        for child in self.notebook.winfo_children():
+            child.configure(background="white")
         
         # 创建各个设置标签页
         self._create_layout_tab()
@@ -92,11 +104,11 @@ class SettingsWindow:
         
     def _create_layout_tab(self) -> None:
         """创建排版设置标签页"""
-        layout_frame = tk.Frame(self.notebook)
+        layout_frame = ttk.Frame(self.notebook)
         self.notebook.add(layout_frame, text="排版设置")
         
         # 控件大小设置
-        control_size_frame = ttk.LabelFrame(layout_frame, text="控件大小")
+        control_size_frame = ttk.LabelFrame(layout_frame, text="控件大小", style="TFrame")
         control_size_frame.pack(fill=tk.X, padx=10, pady=5)
         
         # 时间显示控件大小
@@ -118,7 +130,7 @@ class SettingsWindow:
         self.schedule_size.insert(0, str(self.main_app.config_handler.schedule_size))
         
         # 间距设置
-        padding_frame = ttk.LabelFrame(layout_frame, text="间距设置")
+        padding_frame = ttk.LabelFrame(layout_frame, text="间距设置", style="TFrame")
         padding_frame.pack(fill=tk.X, padx=10, pady=5)
         
         # 水平间距设置
@@ -135,11 +147,11 @@ class SettingsWindow:
 
     def _create_window_tab(self) -> None:
         """创建窗口控制标签页"""
-        window_frame = tk.Frame(self.notebook)
+        window_frame = ttk.Frame(self.notebook)
         self.notebook.add(window_frame, text="窗口控制")
         
         # 窗口位置控制
-        pos_frame = ttk.LabelFrame(window_frame, text="窗口位置")
+        pos_frame = ttk.LabelFrame(window_frame, text="窗口位置", style="TFrame")
         pos_frame.pack(fill=tk.X, padx=10, pady=5)
         
         def create_button(frame, text, dx, dy):
@@ -170,7 +182,7 @@ class SettingsWindow:
         create_button(pos_frame, "↓", 0, 10)
 
         # 窗口大小控制
-        size_frame = ttk.LabelFrame(window_frame, text="窗口大小")
+        size_frame = ttk.LabelFrame(window_frame, text="窗口大小", style="TFrame")
         size_frame.pack(fill=tk.X, padx=10, pady=5)
         
         ttk.Label(size_frame, text="宽度:").grid(row=0, column=0, padx=5, pady=5)
@@ -185,11 +197,11 @@ class SettingsWindow:
 
     def _create_course_tab(self) -> None:
         """创建课程设置标签页"""
-        course_frame = tk.Frame(self.notebook)
+        course_frame = ttk.Frame(self.notebook)
         self.notebook.add(course_frame, text="课程设置")
         
         # 课程时长设置
-        duration_frame = ttk.LabelFrame(course_frame, text="课程时长设置")
+        duration_frame = ttk.LabelFrame(course_frame, text="课程时长设置", style="TFrame")
         duration_frame.pack(fill=tk.X, padx=10, pady=5)
         
         ttk.Label(duration_frame, text="课程时长（分钟）:").grid(row=0, column=0, padx=5, pady=5)
@@ -201,14 +213,16 @@ class SettingsWindow:
         self.auto_complete_var = tk.BooleanVar(value=self.main_app.config_handler.auto_complete_end_time)
         self.auto_complete_check = ttk.Checkbutton(
             duration_frame, text="自动补全结束时间",
-            variable=self.auto_complete_var)
+            variable=self.auto_complete_var,
+            style="White.TCheckbutton")
         self.auto_complete_check.grid(row=1, column=0, columnspan=2, padx=5, pady=5)
         
         # 自动计算下一个课程时间
         self.auto_calculate_var = tk.BooleanVar(value=self.main_app.config_handler.auto_calculate_next_course)
         self.auto_calculate_check = ttk.Checkbutton(
             duration_frame, text="自动计算下一个课程时间",
-            variable=self.auto_calculate_var)
+            variable=self.auto_calculate_var,
+            style="White.TCheckbutton")
         self.auto_calculate_check.grid(row=2, column=0, columnspan=2, padx=5, pady=5)
         
         # 课间时间设置
@@ -218,11 +232,11 @@ class SettingsWindow:
         self.break_duration_entry.insert(0, str(self.main_app.config_handler.break_duration))
 
         # 倒计时与默认课表设置
-        gaokao_frame = ttk.LabelFrame(course_frame, text="倒计时与默认课表")
+        gaokao_frame = ttk.LabelFrame(course_frame, text="倒计时与默认课表", style="TFrame")
         gaokao_frame.pack(fill=tk.X, padx=10, pady=5)
         
         # 倒计时设置
-        countdown_frame = ttk.LabelFrame(gaokao_frame, text="倒计时设置")
+        countdown_frame = ttk.LabelFrame(gaokao_frame, text="倒计时设置", style="TFrame")
         countdown_frame.pack(fill=tk.X, padx=5, pady=5)
         
         ttk.Label(countdown_frame, text="倒计时名称:").grid(row=0, column=0, padx=5, pady=5)
@@ -236,7 +250,7 @@ class SettingsWindow:
         self.countdown_date_entry.insert(0, self.main_app.config_handler.countdown_date.strftime("%Y-%m-%d"))
 
         # 默认课表设置
-        courses_frame = ttk.LabelFrame(gaokao_frame, text="默认课表设置")
+        courses_frame = ttk.LabelFrame(gaokao_frame, text="默认课表设置", style="TFrame")
         courses_frame.pack(fill=tk.X, padx=5, pady=5)
         
         self.courses_text = tk.Text(courses_frame, height=5, width=30)
@@ -247,11 +261,11 @@ class SettingsWindow:
 
     def _create_theme_tab(self) -> None:
         """创建主题设置标签页"""
-        theme_frame = tk.Frame(self.notebook)
+        theme_frame = ttk.Frame(self.notebook)
         self.notebook.add(theme_frame, text="主题设置")
         
         # 字体设置
-        font_frame = ttk.LabelFrame(theme_frame, text="字体设置")
+        font_frame = ttk.LabelFrame(theme_frame, text="字体设置", style="TFrame")
         font_frame.pack(fill=tk.X, padx=10, pady=5)
         
         # 字体大小设置
@@ -262,7 +276,7 @@ class SettingsWindow:
         
         # 字体颜色设置
         def choose_color():
-            color = tk.colorchooser.askcolor()[1]
+            color = ttk.colorchooser.askcolor()[1]
             if color:
                 self.font_color = color
                 self.color_preview.config(bg=color)
@@ -273,28 +287,30 @@ class SettingsWindow:
         ttk.Button(font_frame, text="选择颜色", command=choose_color, style="TButton").grid(row=1, column=1, padx=5, pady=5)
         
         # 透明度设置
-        transparent_frame = ttk.LabelFrame(theme_frame, text="透明度设置")
+        transparent_frame = ttk.LabelFrame(theme_frame, text="透明度设置", style="TFrame")
         transparent_frame.pack(fill=tk.X, padx=10, pady=5)
         
         self.transparent_var = tk.BooleanVar(value=self.main_app.config_handler.transparent_background)
         self.transparent_check = ttk.Checkbutton(
             transparent_frame, text="主界面透明度",
-            variable=self.transparent_var)
+            variable=self.transparent_var,
+            style="White.TCheckbutton")
         self.transparent_check.pack()
 
     def _create_other_tab(self) -> None:
         """创建其他设置标签页"""
-        other_frame = tk.Frame(self.notebook)
+        other_frame = ttk.Frame(self.notebook)
         self.notebook.add(other_frame, text="其他设置")
         
         # 开机自启动设置
-        auto_start_frame = ttk.LabelFrame(other_frame, text="开机自启动")
+        auto_start_frame = ttk.LabelFrame(other_frame, text="开机自启动", style="TFrame")
         auto_start_frame.pack(fill=tk.X, padx=10, pady=5)
         
         self.auto_start_var = tk.BooleanVar(value=self.main_app.config_handler.auto_start)
         self.auto_start_check = ttk.Checkbutton(
             auto_start_frame, text="开机时自动启动程序",
-            variable=self.auto_start_var)
+            variable=self.auto_start_var,
+            style="White.TCheckbutton")
         self.auto_start_check.pack(side=tk.LEFT, padx=5)
 
 

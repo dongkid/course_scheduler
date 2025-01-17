@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 from typing import Callable
+from tools.fullscreen_time import FullscreenTimeWindow
 
 class ToolsWindow:
     """小工具窗口类"""
@@ -82,8 +83,8 @@ class ToolsWindow:
         
     def _show_fullscreen_time(self):
         """显示全屏大号时间"""
-        # TODO: 实现全屏大号时间功能
-        pass
+        self.fullscreen_time_window = FullscreenTimeWindow(self.root)
+        self.fullscreen_time_window.show()
         
     def _show_todo(self):
         """显示未完待续"""
