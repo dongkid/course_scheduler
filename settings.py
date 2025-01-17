@@ -313,6 +313,15 @@ class SettingsWindow:
             style="White.TCheckbutton")
         self.auto_start_check.pack(side=tk.LEFT, padx=5)
 
+        # 添加全屏时间副标题设置
+        fullscreen_frame = ttk.LabelFrame(other_frame, text="全屏时间设置", style="TFrame")
+        fullscreen_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        ttk.Label(fullscreen_frame, text="副标题内容:").grid(row=0, column=0, padx=5, pady=5)
+        self.fullscreen_subtitle_entry = ttk.Entry(fullscreen_frame, width=30)
+        self.fullscreen_subtitle_entry.grid(row=0, column=1, padx=5, pady=5)
+        self.fullscreen_subtitle_entry.insert(0, self.main_app.config_handler.fullscreen_subtitle)
+
 
 
     def restart_ui(self) -> None:
@@ -446,6 +455,9 @@ class SettingsWindow:
             # 应用字体设置
             self.main_app.config_handler.font_size = self.font_size.get()
             self.main_app.config_handler.font_color = self.font_color
+            
+            # 应用全屏时间副标题设置
+            self.main_app.config_handler.fullscreen_subtitle = self.fullscreen_subtitle_entry.get()
             
             self.main_app.config_handler.save_config()
             # 更新字体设置

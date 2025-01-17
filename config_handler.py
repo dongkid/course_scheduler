@@ -22,6 +22,8 @@ class ConfigHandler:
         self.time_display_size = 16
         self.countdown_size = 14
         self.schedule_size = 12
+        self.transparent_background = False
+        self.fullscreen_subtitle = "祝考生考试顺利"
 
     def initialize_config(self):
         """加载或初始化配置文件"""
@@ -48,6 +50,7 @@ class ConfigHandler:
                 self.countdown_size = self.config.get("countdown_size", 18)
                 self.schedule_size = self.config.get("schedule_size", 16)
                 self.transparent_background = self.config.get("transparent_background", False)
+                self.fullscreen_subtitle = self.config.get("fullscreen_subtitle", "祝考生考试顺利")
         else:
             self.config = {"geometry": DEFAULT_GEOMETRY}
             self.countdown_name = "高考"
@@ -86,5 +89,6 @@ class ConfigHandler:
         self.config["countdown_size"] = self.countdown_size
         self.config["schedule_size"] = self.schedule_size
         self.config["transparent_background"] = self.transparent_background
+        self.config["fullscreen_subtitle"] = self.fullscreen_subtitle
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(self.config, f, ensure_ascii=False, indent=2)

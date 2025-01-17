@@ -5,13 +5,15 @@ from tools.fullscreen_time import FullscreenTimeWindow
 
 class ToolsWindow:
     """小工具窗口类"""
-    def __init__(self, root: tk.Tk):
+    def __init__(self, root: tk.Tk, config_handler):
         """初始化小工具窗口
         
         Args:
             root: 主窗口
+            config_handler: 配置处理器
         """
         self.root = root
+        self.config_handler = config_handler
         self.window = None
         self.style = ttk.Style()
         
@@ -83,7 +85,7 @@ class ToolsWindow:
         
     def _show_fullscreen_time(self):
         """显示全屏大号时间"""
-        self.fullscreen_time_window = FullscreenTimeWindow(self.root)
+        self.fullscreen_time_window = FullscreenTimeWindow(self.root, self.config_handler)
         self.fullscreen_time_window.show()
         
     def _show_todo(self):

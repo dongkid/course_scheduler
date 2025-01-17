@@ -380,5 +380,5 @@ class CourseScheduler:
         """显示小工具窗口"""
         from tools_window import ToolsWindow
         if not hasattr(self, 'tools_window') or not self.tools_window.window.winfo_exists():
-            self.tools_window = ToolsWindow(self.root)
+            self.tools_window = ToolsWindow(self.root, self.config_handler)
         self.tools_window.show()

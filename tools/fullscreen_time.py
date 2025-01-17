@@ -7,13 +7,15 @@ import pycaw
 class FullscreenTimeWindow:
     """全屏时间窗口类"""
     
-    def __init__(self, root: tk.Tk):
+    def __init__(self, root: tk.Tk, config_handler):
         """初始化全屏时间窗口
         
         Args:
             root: 主窗口
+            config_handler: 配置处理器
         """
         self.root = root
+        self.config_handler = config_handler
         self.window = None
         self.time_label = None
         self.update_time_id = None
@@ -38,6 +40,8 @@ class FullscreenTimeWindow:
         style.configure("White.TCheckbutton",
                       background="white",
                       foreground="black")
+        style.configure("Small.TButton",
+                      font=("微软雅黑", 8))
         
         # 添加静音复选框
         self.mute_var = tk.BooleanVar(value=False)
@@ -48,7 +52,17 @@ class FullscreenTimeWindow:
             command=self._toggle_mute,
             style="White.TCheckbutton"
         )
-        self.mute_checkbox.place(relx=1.0, rely=1.0, anchor="se", x=-20, y=-20)
+        self.mute_checkbox.place(relx=1.0, rely=1.0, anchor="se", x=-20, y=-80)
+        
+        # 添加退出按钮
+        self.exit_button = ttk.Button(
+            self.window,
+            text="退出全屏",
+            command=self.window.destroy,
+            style="Small.TButton",
+            width=8
+        )
+        self.exit_button.place(relx=1.0, rely=1.0, anchor="se", x=-20, y=-20)
         
         # 创建时间标签
         self.time_label = tk.Label(
@@ -58,6 +72,16 @@ class FullscreenTimeWindow:
             bg="white"
         )
         self.time_label.pack(expand=True)
+        
+        # 创建副标题标签
+        self.subtitle_label = tk.Label(
+            self.window,
+            text=self.config_handler.fullscreen_subtitle,
+            font=("微软雅黑", 40),
+            fg="#808080",
+            bg="white"
+        )
+        self.subtitle_label.pack(pady=(0, 250))
         
         # 开始更新时间
         self._update_time()
