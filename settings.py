@@ -63,7 +63,7 @@ class SettingsWindow:
         # 添加副标题
         subtitle_label = ttk.Label(
             main_frame,
-            text="设置  v0.1.5",
+            text=f"设置  v{VERSION}",
             style="Subtitle.TLabel"
         )
         subtitle_label.pack(pady=(0, 20))

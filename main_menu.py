@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 from typing import Callable
+from constants import VERSION
 
 class MainMenu:
     """主菜单类"""
@@ -63,7 +64,7 @@ class MainMenu:
         # 添加副标题
         subtitle_label = ttk.Label(
             main_frame,
-            text="主菜单  v0.1.5",
+            text=f"主菜单  v{VERSION}",
             style="Subtitle.TLabel"
         )
         subtitle_label.pack(pady=(0, 20))
