@@ -7,6 +7,7 @@ from constants import SCHEDULE_FILE, WEEKDAYS
 from config_handler import ConfigHandler
 from logger import logger
 from main_menu import MainMenu
+
 class CourseScheduler:
     """课程表主应用类"""
     def __init__(self):
@@ -18,8 +19,6 @@ class CourseScheduler:
             self.schedule: Dict[str, List[Dict[str, str]]] = {}
             self.course_labels: List[tk.Label] = []
             self.course_duration = 40 # 默认课程时长为45分钟
-            
-            self._initialize_schedule()
             
             self._initialize_schedule()
             self._initialize_ui()
@@ -76,7 +75,28 @@ class CourseScheduler:
         self._create_time_display()
         self._create_countdown_display()
         self._create_schedule_display()
-        self._create_buttons()
+        
+        # 创建主菜单按钮
+        button_frame = tk.Frame(self.root)
+        button_frame.pack(pady=self.config_handler.vertical_padding)
+        
+        # 初始化主菜单
+        self.main_menu = MainMenu(
+            self.root,
+            {
+                "编辑课表": self.open_editor,
+                "设置": self.open_settings,
+                "关于": self.open_about,
+                "重启主界面": self.restart_ui,
+                "退出程序": self.root.quit,
+                "小工具（待开发）": lambda: None
+            }
+        )
+        
+        # 添加主菜单按钮
+        menu_button = self.main_menu.create_menu_button(button_frame)
+        menu_button.pack(side=tk.LEFT, padx=5)
+        
         self._update_font_settings()
         if self.config_handler.transparent_background:
             self.root.attributes("-transparentcolor", "white")
@@ -135,27 +155,6 @@ class CourseScheduler:
         self.schedule_frame.pack(padx=self.config_handler.horizontal_padding, 
                                pady=self.config_handler.vertical_padding, 
                                fill=tk.BOTH, expand=True)
-
-    def _create_buttons(self) -> None:
-        """创建功能按钮区域"""
-        button_frame = tk.Frame(self.root)
-        button_frame.pack(pady=self.config_handler.vertical_padding)
-        
-        # 添加主菜单按钮
-        tk.Button(button_frame, text="主菜单", command=self.show_main_menu).pack(side=tk.LEFT, padx=5)
-        
-        # 初始化主菜单
-        self.main_menu = MainMenu(
-            self.root,
-                {
-                    "编辑课表": self.open_editor,
-                    "设置": self.open_settings,
-                    "关于": self.open_about,
-                    "重启主界面": self.restart_ui,
-                    "退出程序": self.root.quit,
-                    "小工具（待开发）": lambda: None
-                }
-        )
 
     def _start_update_loop(self) -> None:
         """启动界面更新循环"""
@@ -355,21 +354,6 @@ class CourseScheduler:
         except Exception as e:
             logger.log_error(e)
             raise
-
-    def show_main_menu(self) -> None:
-        """显示主菜单"""
-        if self.main_menu is None:
-            self.main_menu = MainMenu(
-                self.root,
-                {
-                    "编辑课表": self.open_editor,
-                    "设置": self.open_settings,
-                    "关于": self.open_about,
-                    "重启主界面": self.restart_ui,
-                    "小工具（待开发）": lambda: None
-                }
-            )
-        self.main_menu.show()
     
     def open_editor(self):
         from editor import EditorWindow

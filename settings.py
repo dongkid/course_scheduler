@@ -42,7 +42,7 @@ class SettingsWindow:
         button_frame = tk.Frame(self.window)
         button_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=10)
         
-        tk.Button(button_frame, text="应用", command=self.apply_settings).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="应用", command=self.apply_settings).pack(side=tk.TOP, pady=10)
         
     def _create_layout_tab(self) -> None:
         """创建排版设置标签页"""

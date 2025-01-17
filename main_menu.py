@@ -80,3 +80,11 @@ class MainMenu:
                 style="TButton"
             )
             btn.pack(side=tk.LEFT, padx=10, pady=5)
+
+    def create_menu_button(self, parent: tk.Widget) -> tk.Button:
+        """创建主菜单按钮"""
+        return tk.Button(
+            parent,
+            text="主菜单",
+            command=self.show
+        )
