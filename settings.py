@@ -276,7 +276,7 @@ class SettingsWindow:
         
         # 字体颜色设置
         def choose_color():
-            color = ttk.colorchooser.askcolor()[1]
+            color = colorchooser.askcolor()[1]
             if color:
                 self.font_color = color
                 self.color_preview.config(bg=color)
