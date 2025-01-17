@@ -82,12 +82,22 @@ class MainMenu:
             )
             btn.pack(side=tk.LEFT, padx=10, pady=5)
 
-    def create_menu_button(self, parent: tk.Widget) -> tk.Button:
+    def create_menu_button(self, parent: tk.Widget) -> ttk.Button:
         """创建主菜单按钮"""
-        return tk.Button(
+        # 配置主菜单按钮样式
+        self.style.configure("Menu.TButton", 
+                           font=("微软雅黑", 12),
+                           padding=3,
+                           width=8,
+                           foreground="#000000",
+                           background="#ffffff",
+                           borderwidth=0)
+        
+        return ttk.Button(
             parent,
             text="主菜单",
-            command=self.show
+            command=self.show,
+            style="Menu.TButton"
         )
         
     def _show_tools_window(self):
