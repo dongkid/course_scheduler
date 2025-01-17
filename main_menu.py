@@ -89,3 +89,8 @@ class MainMenu:
             text="主菜单",
             command=self.show
         )
+        
+    def _show_tools_window(self):
+        """显示小工具窗口"""
+        from tools_window import ToolsWindow
+        ToolsWindow(self.root).show()

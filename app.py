@@ -89,7 +89,7 @@ class CourseScheduler:
                 "关于": self.open_about,
                 "重启主界面": self.restart_ui,
                 "退出程序": self.root.quit,
-                "小工具（待开发）": lambda: None
+                "小工具": self._show_tools_window
             }
         )
         
@@ -375,3 +375,10 @@ class CourseScheduler:
             self.about_window = AboutWindow(self.root)
         else:
             self.about_window.window.lift()
+            
+    def _show_tools_window(self):
+        """显示小工具窗口"""
+        from tools_window import ToolsWindow
+        if not hasattr(self, 'tools_window') or not self.tools_window.window.winfo_exists():
+            self.tools_window = ToolsWindow(self.root)
+        self.tools_window.show()
