@@ -32,7 +32,7 @@ jobs:
 
     - name: Build with Python
       run: |
-        pyinstaller --onefile --name=course_scheduler --icon=icon.ico --add-data "icon.png;." --clean --noconfirm --noconsole main.py
+        pyinstaller --onefile --name=course_scheduler --icon=res/icon.ico --add-data "res/icon.png;." --clean --noconfirm --noconsole main.py
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v3

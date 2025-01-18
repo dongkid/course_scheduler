@@ -29,7 +29,7 @@ class AboutWindow:
         header_frame.pack(fill=tk.X, pady=(0, 10))
         
         try:
-            icon = PhotoImage(file=sys._MEIPASS + "/icon.png") if hasattr(sys, '_MEIPASS') else PhotoImage(file="icon.png")
+            icon = PhotoImage(file=sys._MEIPASS + "/icon.png") if hasattr(sys, '_MEIPASS') else PhotoImage(file="res/icon.png")
             # 调整图标大小
             icon = icon.subsample(10, 10)  # 缩小为原来的1/5
             icon_label = tk.Label(header_frame, image=icon)

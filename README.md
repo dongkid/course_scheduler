@@ -78,7 +78,7 @@ python main.py
 pip install pyinstaller
 
 # 构建可执行文件
-pyinstaller --onefile --name=course_scheduler --icon=icon.ico --clean --noconfirm main.py
+pyinstaller --onefile --name=course_scheduler --icon=res/icon.ico --clean --noconfirm main.py
 
 # 构建完成后，可执行文件位于dist目录下
 ```
