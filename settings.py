@@ -89,6 +89,7 @@ class SettingsWindow:
         self._create_window_tab()
         self._create_course_tab()
         self._create_theme_tab()
+        self._create_tools_tab()
         self._create_other_tab()
 
         # 在Notebook下方创建操作按钮
@@ -297,6 +298,20 @@ class SettingsWindow:
             style="White.TCheckbutton")
         self.transparent_check.pack()
 
+    def _create_tools_tab(self) -> None:
+        """创建小工具设置标签页"""
+        tools_frame = ttk.Frame(self.notebook)
+        self.notebook.add(tools_frame, text="小工具")
+        
+        # 添加全屏时间副标题设置
+        fullscreen_frame = ttk.LabelFrame(tools_frame, text="全屏时间设置", style="TFrame")
+        fullscreen_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        ttk.Label(fullscreen_frame, text="副标题内容:").grid(row=0, column=0, padx=5, pady=5)
+        self.fullscreen_subtitle_entry = ttk.Entry(fullscreen_frame, width=30)
+        self.fullscreen_subtitle_entry.grid(row=0, column=1, padx=5, pady=5)
+        self.fullscreen_subtitle_entry.insert(0, self.main_app.config_handler.fullscreen_subtitle)
+
     def _create_other_tab(self) -> None:
         """创建其他设置标签页"""
         other_frame = ttk.Frame(self.notebook)
@@ -312,15 +327,6 @@ class SettingsWindow:
             variable=self.auto_start_var,
             style="White.TCheckbutton")
         self.auto_start_check.pack(side=tk.LEFT, padx=5)
-
-        # 添加全屏时间副标题设置
-        fullscreen_frame = ttk.LabelFrame(other_frame, text="全屏时间设置", style="TFrame")
-        fullscreen_frame.pack(fill=tk.X, padx=10, pady=5)
-
-        ttk.Label(fullscreen_frame, text="副标题内容:").grid(row=0, column=0, padx=5, pady=5)
-        self.fullscreen_subtitle_entry = ttk.Entry(fullscreen_frame, width=30)
-        self.fullscreen_subtitle_entry.grid(row=0, column=1, padx=5, pady=5)
-        self.fullscreen_subtitle_entry.insert(0, self.main_app.config_handler.fullscreen_subtitle)
 
 
 
@@ -453,7 +459,7 @@ class SettingsWindow:
             self.main_app.config_handler.transparent_background = self.transparent_var.get()
             
             # 应用字体设置
-            self.main_app.config_handler.font_size = self.font_size.get()
+            self.main_app.config_handler.font_size = int(self.font_size.get())
             self.main_app.config_handler.font_color = self.font_color
             
             # 应用全屏时间副标题设置

@@ -42,7 +42,7 @@ class ConfigHandler:
                 self.auto_calculate_next_course = self.config.get("auto_calculate_next_course", True)
                 self.break_duration = self.config.get("break_duration", 10)
                 self.default_courses = self.config.get("default_courses", ["语文", "数学", "英语", "物理", "化学", "生物", "历史", "地理", "政治"])
-                self.font_size = self.config.get("font_size", 12)
+                self.font_size = int(self.config.get("font_size", 12))
                 self.font_color = self.config.get("font_color", "#000000")
                 self.horizontal_padding = self.config.get("horizontal_padding", 10)
                 self.vertical_padding = self.config.get("vertical_padding", 5)
