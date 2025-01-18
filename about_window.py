@@ -1,8 +1,19 @@
 import tkinter as tk
+from tkinter import ttk
 import subprocess
 import sys
 from tkinter import PhotoImage
 from constants import APP_NAME, VERSION, PROJECT_URL
+
+# 配置ttk样式
+def configure_styles():
+    style = ttk.Style()
+    style.configure("AboutWindow.TFrame", background="white", padding=0)
+    style.configure("AboutWindow.TLabel", background="white", font=("Microsoft YaHei", 8), padding=0)
+    style.configure("AboutWindow.Title.TLabel", font=("Microsoft YaHei", 12, "bold"), padding=0)
+    style.configure("AboutWindow.Url.TLabel", foreground="blue", font=("Microsoft YaHei", 5, "underline"), padding=0)
+    style.layout("AboutWindow.TFrame", [])
+    style.layout("AboutWindow.TLabel", [])
 
 class AboutWindow:
     def __init__(self, parent):
@@ -16,49 +27,58 @@ class AboutWindow:
         window = tk.Toplevel(self.parent)
         window.title("关于")
         window.geometry("500x200")
+        window.minsize(500, 200)
+        window.maxsize(600, 240)  # 设置窗口最大大小
+        window.configure(bg="white")
         return window
+
+    def _update_font_size(self, event=None):
+        """根据窗口宽度动态调整所有文本字体大小"""
+        width = self.window.winfo_width()
+        base_size = max(10, min(50, int(width / 25)))  # 基础字体大小
+        style = ttk.Style()
+        # 标题字体
+        style.configure("AboutWindow.Title.TLabel", font=("Microsoft YaHei", base_size, "bold"), padding=0)
+        # 普通文本字体
+        style.configure("AboutWindow.TLabel", font=("Microsoft YaHei", int(base_size * 0.8)), padding=0)
+        # URL文本字体
+        style.configure("AboutWindow.Url.TLabel", font=("Microsoft YaHei", int(base_size * 0.6), "underline"), padding=0)
 
     def _initialize_ui(self) -> None:
         """初始化关于界面"""
-        # 主容器
-        main_frame = tk.Frame(self.window)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        # 绑定窗口大小变化事件
+        self.window.bind("<Configure>", self._update_font_size)
         
-        # 图标和标题
-        header_frame = tk.Frame(main_frame)
-        header_frame.pack(fill=tk.X, pady=(0, 10))
+        # 主容器
+        main_frame = ttk.Frame(self.window, style="AboutWindow.TFrame")
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # 顶部区域：图标和标题
+        top_frame = ttk.Frame(main_frame, style="AboutWindow.TFrame",width=3)
+        top_frame.pack(fill=tk.X, pady=(0, 3))
         
         try:
             icon = PhotoImage(file=sys._MEIPASS + "/icon.png") if hasattr(sys, '_MEIPASS') else PhotoImage(file="res/icon.png")
-            # 调整图标大小
-            icon = icon.subsample(10, 10)  # 缩小为原来的1/5
-            icon_label = tk.Label(header_frame, image=icon)
-            icon_label.image = icon  # 保持引用
-            icon_label.pack(side=tk.LEFT, padx=(0, 20))
+            icon = icon.subsample(15, 15)  # 进一步缩小图标
+            icon_label = tk.Label(top_frame, image=icon, bg="white")
+            icon_label.image = icon
+            icon_label.pack(side=tk.LEFT, padx=(0, 10))
         except Exception as e:
             print(f"无法加载图标: {e}")
         
-        title_label = tk.Label(
-            header_frame,
-            text=APP_NAME,
-            font=("Arial", 16, "bold")
-        )
-        title_label.pack(side=tk.LEFT, padx=(0, 10))
+        title_frame = ttk.Frame(top_frame, style="AboutWindow.TFrame")
+        title_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
-        # 信息面板
-        info_frame = tk.Frame(main_frame)
+        ttk.Label(title_frame, text=APP_NAME, style="AboutWindow.Title.TLabel").pack(anchor=tk.W)
+        ttk.Label(title_frame, text=f"版本: {VERSION}", style="AboutWindow.TLabel").pack(anchor=tk.W)
+
+        # 信息区域
+        info_frame = ttk.Frame(main_frame, style="AboutWindow.TFrame")
         info_frame.pack(fill=tk.BOTH, expand=True)
         
-        # 版本信息
-        version_frame = tk.Frame(info_frame)
-        version_frame.pack(fill=tk.X, pady=5)
-        tk.Label(version_frame, text="版本:", width=8, anchor=tk.W).pack(side=tk.LEFT)
-        tk.Label(version_frame, text=VERSION).pack(side=tk.LEFT)
-        
         # 项目地址
-        url_frame = tk.Frame(info_frame)
-        url_frame.pack(fill=tk.X, pady=5)
-        tk.Label(url_frame, text="项目地址:", width=8, anchor=tk.W).pack(side=tk.LEFT)
+        url_frame = ttk.Frame(info_frame, style="AboutWindow.TFrame")
+        url_frame.pack(fill=tk.X, pady=2)
         
         def open_project_url():
             if sys.platform == 'win32':
@@ -68,17 +88,16 @@ class AboutWindow:
             else:
                 subprocess.Popen(['xdg-open', PROJECT_URL])
             
-        url_label = tk.Label(
+        url_label = ttk.Label(
             url_frame,
-            text=PROJECT_URL,
-            fg="blue",
+            text=f"项目地址: {PROJECT_URL}",
+            style="AboutWindow.Url.TLabel",
             cursor="hand2"
         )
-        url_label.pack(side=tk.LEFT)
+        url_label.pack(anchor=tk.W)
         url_label.bind("<Button-1>", lambda e: open_project_url())
 
         # 开源协议
-        license_frame = tk.Frame(info_frame)
-        license_frame.pack(fill=tk.X, pady=5)
-        tk.Label(license_frame, text="开源协议:", width=8, anchor=tk.W).pack(side=tk.LEFT)
-        tk.Label(license_frame, text="GNU General Public License v3.0").pack(side=tk.LEFT)
+        license_frame = ttk.Frame(info_frame, style="AboutWindow.TFrame")
+        license_frame.pack(fill=tk.X, pady=2)
+        ttk.Label(license_frame, text="开源协议: GNU General Public License v3.0", style="AboutWindow.TLabel").pack(anchor=tk.W)

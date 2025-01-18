@@ -39,30 +39,32 @@ class CourseScheduler:
         """加载或初始化课程表数据"""
         if os.path.exists(SCHEDULE_FILE):
             with open(SCHEDULE_FILE, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                if isinstance(data, dict):
-                    self.schedule = data
+                schedule_data = json.load(f)
+                # 兼容旧版单套课表
+                if "schedules" not in schedule_data:
+                    self.schedule = {
+                        "current_schedule": "default",
+                        "schedules": {
+                            "default": schedule_data
+                        }
+                    }
                 else:
-                    self.schedule = {str(i): [] for i in range(7)}
-                    self._save_schedule()
+                    self.schedule = schedule_data
         else:
-            self.schedule = {str(i): [] for i in range(7)}
+            # 初始化默认课表
+            self.schedule = {
+                "current_schedule": "default",
+                "schedules": {
+                    "default": {
+                        "0": [], "1": [], "2": [], "3": [], 
+                        "4": [], "5": [], "6": []
+                    }
+                }
+            }
             self._save_schedule()
-        
-    def load_schedule(self):
-        if os.path.exists(SCHEDULE_FILE):
-            with open(SCHEDULE_FILE, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                if isinstance(data, dict):
-                    self.schedule = data
-                else:
-                    self.schedule = {str(i): [] for i in range(7)}
-                    self.save_schedule()
-        else:
-            self.schedule = {str(i): [] for i in range(7)}
-            self.save_schedule()
     
     def save_schedule(self):
+        """保存课表"""
         with open(SCHEDULE_FILE, 'w', encoding='utf-8') as f:
             json.dump(self.schedule, f, ensure_ascii=False, indent=2)
     
@@ -112,6 +114,23 @@ class CourseScheduler:
             bg="#ecf0f1"
         )
         self.time_label.pack(pady=self.config_handler.vertical_padding, fill=tk.X)
+        
+        # 添加点击事件
+        self.time_label.bind("<Button-1>", self._on_time_label_click)
+        
+    def _on_time_label_click(self, event):
+        """处理时间标签点击事件"""
+        from tkinter import messagebox
+        from tools.fullscreen_time import FullscreenTimeWindow
+        
+        result = messagebox.askyesno(
+            "全屏时间",
+            "是否开启全屏时间？"
+        )
+        if result:
+            if not hasattr(self, "fullscreen_time_window"):
+                self.fullscreen_time_window = FullscreenTimeWindow(self.root, self.config_handler)
+            self.fullscreen_time_window.show()
 
     def _create_countdown_display(self) -> None:
         """创建倒计时显示区域"""
@@ -191,12 +210,20 @@ class CourseScheduler:
             self.course_labels = []
             
         weekday = str(now.weekday())
-        today_schedule = self.schedule.get(weekday, [])
+        today_schedule = self.schedule["schedules"][self.schedule["current_schedule"]].get(weekday, [])
         
         # 过滤掉已销毁的标签
         self.course_labels = [label for label in self.course_labels if label.winfo_exists()]
         
-        self._update_course_labels(now, today_schedule)
+        # 仅更新或创建必要的标签
+        for i, course in enumerate(today_schedule):
+            color = self._get_course_color(now, course)
+            if i < len(self.course_labels):
+                self._update_existing_label(i, course, color)
+            else:
+                self._create_new_label(course, color)
+        
+        # 移除多余的标签
         self._remove_extra_labels(today_schedule)
 
     def _update_course_labels(self, now: datetime, schedule: List[Dict[str, str]]) -> None:
@@ -285,7 +312,7 @@ class CourseScheduler:
     def _create_new_label(self, course: Dict[str, str], color: str) -> None:
         """创建新课程标签"""
         course_frame = tk.Frame(self.schedule_frame)
-        course_frame.pack(fill=tk.X, pady=2)
+        course_frame.grid(row=len(self.course_labels), column=0, sticky="ew", pady=2)
         
         label = tk.Label(
             course_frame,
@@ -308,6 +335,9 @@ class CourseScheduler:
         status_canvas.pack(side=tk.RIGHT, padx=5)
         label.status_canvas = status_canvas
         self.course_labels.append(label)
+        
+        # 配置列权重
+        self.schedule_frame.grid_columnconfigure(0, weight=1)
 
     def _remove_extra_labels(self, schedule: List[Dict[str, str]]) -> None:
         """移除多余的课程标签"""
