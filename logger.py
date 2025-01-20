@@ -1,4 +1,7 @@
 import logging
+import threading
+from logging.handlers import QueueHandler
+from queue import Queue
 from datetime import datetime
 from pathlib import Path
 from constants import CONFIG_FILE
@@ -6,7 +9,10 @@ from constants import CONFIG_FILE
 class AppLogger:
     def __init__(self):
         self.log_dir = Path("logs")
-        self._env_logged = False  # 添加环境信息记录标记
+        self._env_logged = False
+        # 创建异步日志队列和监听器
+        self.log_queue = Queue(-1)  # 无限容量队列
+        self.queue_listener = None
         try:
             # 尝试创建日志目录
             self.log_dir.mkdir(exist_ok=True)
@@ -47,23 +53,26 @@ class AppLogger:
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
         
-        # 创建文件处理器
+        # 创建实际处理器
         log_file = self.log_dir / f"app_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
         file_handler = logging.FileHandler(log_file)
         file_handler.setLevel(logging.DEBUG if config.debug_mode else logging.ERROR)
         
-        # 创建控制台处理器
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.DEBUG if config.debug_mode else logging.ERROR)
         
-        # 创建格式化器
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         file_handler.setFormatter(formatter)
         console_handler.setFormatter(formatter)
-        
-        # 添加处理器
-        self.logger.addHandler(file_handler)
-        self.logger.addHandler(console_handler)
+
+        # 设置队列监听器
+        self.queue_listener = logging.handlers.QueueListener(
+            self.log_queue, file_handler, console_handler, respect_handler_level=True
+        )
+        self.queue_listener.start()
+
+        # 添加队列处理器
+        self.logger.addHandler(QueueHandler(self.log_queue))
         
         # 记录日志系统初始化信息
         self.logger.debug("Logger initialized")
@@ -93,6 +102,11 @@ class AppLogger:
 
     def log_info(self, info):
         self.logger.info(f"Info: {str(info)}")
+
+    def shutdown(self):
+        """安全关闭日志系统"""
+        if self.queue_listener:
+            self.queue_listener.stop()
 
     def log_debug(self, debug):
         import platform
