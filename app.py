@@ -13,15 +13,33 @@ class CourseScheduler:
     def __init__(self):
         """初始化课程表应用"""
         try:
-            self.root = self._create_root_window()
-            self.config_handler = ConfigHandler(self.root)
+            logger.log_debug("Initializing CourseScheduler application")
+            # 先初始化配置
+            self.config_handler = ConfigHandler()
+            logger.log_debug("ConfigHandler initialized")
             self.config_handler.initialize_config()
+            logger.log_debug("Configuration initialized")
+            
+            # 创建主窗口并应用配置
+            self.root = self._create_root_window()
+            logger.log_debug("Main window created")
+            self.root.geometry(self.config_handler.geometry)
+            
+            # 初始化其他成员变量
             self.schedule: Dict[str, List[Dict[str, str]]] = {}
             self.course_labels: List[tk.Label] = []
-            self.course_duration = 40 # 默认课程时长为45分钟
+            self.course_duration = self.config_handler.course_duration
+            self.editor_window = None
+            self.settings_window = None
+            self.about_window = None
+            self.main_menu = None
             
+            logger.log_debug("Initializing schedule")
             self._initialize_schedule()
+            logger.log_debug("Schedule initialized")
+            logger.log_debug("Initializing UI")
             self._initialize_ui()
+            logger.log_debug("UI initialized")
         except Exception as e:
             logger.log_error(e)
             raise
@@ -365,25 +383,6 @@ class CourseScheduler:
         # 应用字体设置
         self._adjust_ui_layout()
     
-    def __init__(self):
-        """初始化课程表应用"""
-        try:
-            self.root = self._create_root_window()
-            self.config_handler = ConfigHandler(self.root)
-            self.config_handler.initialize_config()
-            self.schedule: Dict[str, List[Dict[str, str]]] = {}
-            self.course_labels: List[tk.Label] = []
-            self.course_duration = 40 # 默认课程时长为45分钟
-            self.editor_window = None  # 编辑窗口实例
-            self.settings_window = None  # 设置窗口实例
-            self.about_window = None  # 关于窗口实例
-            self.main_menu = None  # 主菜单实例
-            
-            self._initialize_schedule()
-            self._initialize_ui()
-        except Exception as e:
-            logger.log_error(e)
-            raise
     
     def open_editor(self):
         from editor import EditorWindow

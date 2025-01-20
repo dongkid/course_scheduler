@@ -4,8 +4,7 @@ from datetime import datetime
 from constants import DEFAULT_GEOMETRY, CONFIG_FILE
 
 class ConfigHandler:
-    def __init__(self, root_window):
-        self.root = root_window
+    def __init__(self):
         self.config = {}
         self.countdown_name = "高考"
         self.countdown_date = datetime(datetime.now().year + 1, 6, 7)
@@ -24,13 +23,15 @@ class ConfigHandler:
         self.schedule_size = 12
         self.transparent_background = False
         self.fullscreen_subtitle = "祝考生考试顺利"
+        self.debug_mode = False
+        self.geometry = None
 
     def initialize_config(self):
         """加载或初始化配置文件"""
         if os.path.exists(CONFIG_FILE):
             with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
                 self.config = json.load(f)
-                self.root.geometry(self.config["geometry"])
+                self.geometry = self.config.get("geometry", DEFAULT_GEOMETRY)
                 self.countdown_name = self.config.get("countdown_name", "高考")
                 self.countdown_date = datetime.strptime(
                     self.config.get("countdown_date", f"{datetime.now().year + 1}-06-07"),
@@ -51,8 +52,10 @@ class ConfigHandler:
                 self.schedule_size = self.config.get("schedule_size", 16)
                 self.transparent_background = self.config.get("transparent_background", False)
                 self.fullscreen_subtitle = self.config.get("fullscreen_subtitle", "祝考生考试顺利")
+                self.debug_mode = self.config.get("debug_mode", False)
         else:
             self.config = {"geometry": DEFAULT_GEOMETRY}
+            self.geometry = DEFAULT_GEOMETRY
             self.countdown_name = "高考"
             self.countdown_date = datetime(datetime.now().year + 1, 6, 7)
             self.course_duration = 40
@@ -63,16 +66,17 @@ class ConfigHandler:
         if os.path.exists(CONFIG_FILE):
             with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
                 self.config = json.load(f)
-            self.root.geometry(self.config["geometry"])
+            self.geometry = self.config.get("geometry", DEFAULT_GEOMETRY)
             self.gaokao_year = self.config.get("gaokao_year", datetime.now().year + 1)
         else:
             self.config = {"geometry": DEFAULT_GEOMETRY}
+            self.geometry = DEFAULT_GEOMETRY
             self.gaokao_year = datetime.now().year + 1
             self.save_config()
     
     def save_config(self):
         """保存当前配置到文件"""
-        self.config["geometry"] = self.root.geometry()
+        self.config["geometry"] = self.geometry
         self.config["countdown_name"] = self.countdown_name
         self.config["countdown_date"] = self.countdown_date.strftime("%Y-%m-%d")
         self.config["course_duration"] = self.course_duration
@@ -90,5 +94,6 @@ class ConfigHandler:
         self.config["schedule_size"] = self.schedule_size
         self.config["transparent_background"] = self.transparent_background
         self.config["fullscreen_subtitle"] = self.fullscreen_subtitle
+        self.config["debug_mode"] = self.debug_mode
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(self.config, f, ensure_ascii=False, indent=2)

@@ -31,6 +31,8 @@ class SettingsWindow:
         self.style.configure("TFrame", background="white")
         self.style.configure("TLabel", background="white", 
                            font=("微软雅黑", 14))
+        self.style.configure("TLabelframe", background="white")
+        self.style.configure("TLabelframe.Label", background="white")
         self.style.configure("TNotebook", background="white")
         self.style.configure("TNotebook.Tab", background="white", padding=[10, 5])
         # 定义白色风格的Checkbutton
@@ -59,7 +61,7 @@ class SettingsWindow:
         main_frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=20)
         
         # 添加标题
-        title_frame = ttk.Frame(main_frame)
+        title_frame = ttk.Frame(main_frame, style="TFrame")
         title_frame.pack(fill=tk.X, pady=(0, 10))
         
         title_label = ttk.Label(
@@ -93,7 +95,7 @@ class SettingsWindow:
         self._create_other_tab()
 
         # 在Notebook下方创建操作按钮
-        button_frame = ttk.Frame(main_frame)
+        button_frame = ttk.Frame(main_frame, style="TFrame")
         button_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=10)
         
         ttk.Button(
@@ -105,7 +107,7 @@ class SettingsWindow:
         
     def _create_layout_tab(self) -> None:
         """创建排版设置标签页"""
-        layout_frame = ttk.Frame(self.notebook)
+        layout_frame = ttk.Frame(self.notebook, style="TFrame")
         self.notebook.add(layout_frame, text="排版设置")
         
         # 控件大小设置
@@ -148,7 +150,7 @@ class SettingsWindow:
 
     def _create_window_tab(self) -> None:
         """创建窗口控制标签页"""
-        window_frame = ttk.Frame(self.notebook)
+        window_frame = ttk.Frame(self.notebook, style="TFrame")
         self.notebook.add(window_frame, text="窗口控制")
         
         # 窗口位置控制
@@ -198,7 +200,7 @@ class SettingsWindow:
 
     def _create_course_tab(self) -> None:
         """创建课程设置标签页"""
-        course_frame = ttk.Frame(self.notebook)
+        course_frame = ttk.Frame(self.notebook, style="TFrame")
         self.notebook.add(course_frame, text="课程设置")
         
         # 课程时长设置
@@ -262,7 +264,7 @@ class SettingsWindow:
 
     def _create_theme_tab(self) -> None:
         """创建主题设置标签页"""
-        theme_frame = ttk.Frame(self.notebook)
+        theme_frame = ttk.Frame(self.notebook, style="TFrame")
         self.notebook.add(theme_frame, text="主题设置")
         
         # 字体设置
@@ -300,7 +302,7 @@ class SettingsWindow:
 
     def _create_tools_tab(self) -> None:
         """创建小工具设置标签页"""
-        tools_frame = ttk.Frame(self.notebook)
+        tools_frame = ttk.Frame(self.notebook, style="TFrame")
         self.notebook.add(tools_frame, text="小工具")
         
         # 添加全屏时间副标题设置
@@ -314,7 +316,7 @@ class SettingsWindow:
 
     def _create_other_tab(self) -> None:
         """创建其他设置标签页"""
-        other_frame = ttk.Frame(self.notebook)
+        other_frame = ttk.Frame(self.notebook, style="TFrame")
         self.notebook.add(other_frame, text="其他设置")
         
         # 开机自启动设置
@@ -327,6 +329,17 @@ class SettingsWindow:
             variable=self.auto_start_var,
             style="White.TCheckbutton")
         self.auto_start_check.pack(side=tk.LEFT, padx=5)
+
+        # 调试模式设置
+        debug_frame = ttk.LabelFrame(other_frame, text="调试模式", style="TFrame")
+        debug_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        self.debug_var = tk.BooleanVar(value=self.main_app.config_handler.debug_mode)
+        self.debug_check = ttk.Checkbutton(
+            debug_frame, text="启用调试模式",
+            variable=self.debug_var,
+            style="White.TCheckbutton")
+        self.debug_check.pack(side=tk.LEFT, padx=5)
 
 
 
@@ -425,6 +438,9 @@ class SettingsWindow:
             else:
                 from auto_start import disable_auto_start
                 disable_auto_start("CourseScheduler")
+            
+            # 应用debug模式设置
+            self.main_app.config_handler.debug_mode = self.debug_var.get()
             
             # 应用自动补全结束时间设置
             self.main_app.config_handler.auto_complete_end_time = self.auto_complete_var.get()
