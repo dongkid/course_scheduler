@@ -96,9 +96,9 @@ class CourseScheduler:
         self._create_countdown_display()
         self._create_schedule_display()
         
-        # 创建主菜单按钮
-        button_frame = tk.Frame(self.root)
-        button_frame.pack(pady=self.config_handler.vertical_padding)
+        # 创建主菜单按钮容器
+        self.button_frame = tk.Frame(self.root)
+        self.button_frame.pack(pady=self.config_handler.vertical_padding)
         
         # 初始化主菜单
         self.main_menu = MainMenu(
@@ -113,8 +113,8 @@ class CourseScheduler:
             }
         )
         
-        # 添加主菜单按钮
-        menu_button = self.main_menu.create_menu_button(button_frame)
+        # 添加主菜单按钮到按钮容器
+        menu_button = self.main_menu.create_menu_button(self.button_frame)
         menu_button.pack(side=tk.LEFT, padx=5)
         
         self._update_font_settings()
@@ -373,15 +373,35 @@ class CourseScheduler:
         # 清空课程标签列表
         self.course_labels = []
         
-        # 销毁现有界面组件
+        # 销毁现有界面组件（包括schedule_frame）
         for widget in self.root.winfo_children():
             widget.destroy()
         
-        # 重新初始化界面
+        # 显式删除框架引用
+        if hasattr(self, 'schedule_frame'):
+            del self.schedule_frame
+        if hasattr(self, 'button_frame'):
+            del self.button_frame
+            
+        # 重新初始化界面（包含_create_schedule_display的原始调用）
         self._initialize_ui()
         
-        # 应用字体设置
+        # 应用字体设置并强制布局更新
         self._adjust_ui_layout()
+        self.root.update_idletasks()  # 立即刷新布局
+        
+        # 确保主菜单已重新初始化
+        self.main_menu = MainMenu(
+            self.root,
+            {
+                "编辑课表": self.open_editor,
+                "设置": self.open_settings,
+                "关于": self.open_about,
+                "重启主界面": self.restart_ui,
+                "退出程序": self.root.quit,
+                "小工具": self._show_tools_window
+            }
+        )
     
     
     def open_editor(self):
