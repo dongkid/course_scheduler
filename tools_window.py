@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Callable
 from tools.fullscreen_time import FullscreenTimeWindow
+from tools.weather import WeatherTool
 
 class ToolsWindow:
     """小工具窗口类"""
@@ -74,6 +75,15 @@ class ToolsWindow:
         )
         fullscreen_time_btn.pack(side=tk.LEFT, padx=10, pady=5)
         
+        # 天气按钮
+        weather_btn = ttk.Button(
+            button_frame,
+            text="天气",
+            command=self._show_weather,
+            style="TButton"
+        )
+        weather_btn.pack(side=tk.LEFT, padx=10, pady=5)
+        
         # 未完待续按钮
         todo_btn = ttk.Button(
             button_frame,
@@ -92,3 +102,8 @@ class ToolsWindow:
         """显示未完待续"""
         # TODO: 实现未完待续功能
         pass
+        
+    def _show_weather(self):
+        """显示天气"""
+        self.weather_tool = WeatherTool()
+        self.weather_tool.show()
