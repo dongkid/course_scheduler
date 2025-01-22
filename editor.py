@@ -93,12 +93,47 @@ class EditorWindow:
         self.copy_button = ttk.Button(selector_frame, text="⧉", command=self._copy_schedule, width=3, style="Small.TButton")
         self.copy_button.pack(side=tk.LEFT, padx=5)
         
+        # 添加重命名按钮
+        self.rename_button = ttk.Button(selector_frame, text="✎", command=self._rename_schedule, width=3, style="Small.TButton")
+        self.rename_button.pack(side=tk.LEFT, padx=5)
+        
         # 添加删除课表按钮
         self.delete_button = ttk.Button(selector_frame, text="-", command=self._delete_schedule, width=3, style="Small.TButton")
         self.delete_button.pack(side=tk.LEFT, padx=5)
         
         # 绑定课表切换事件
         self.schedule_combobox.bind("<<ComboboxSelected>>", self._on_schedule_change)
+
+    def _rename_schedule(self):
+        """重命名当前课表"""
+        old_name = self.schedule_var.get()
+        new_name = simpledialog.askstring("重命名课表", "请输入新名称:", initialvalue=old_name)
+        
+        if not new_name:
+            return
+            
+        if new_name == old_name:
+            return
+            
+        if new_name in self.main_app.schedule["schedules"]:
+            messagebox.showerror("错误", "该名称已存在，请使用其他名称")
+            return
+            
+        try:
+            # 重命名课表数据
+            self.main_app.schedule["schedules"][new_name] = self.main_app.schedule["schedules"].pop(old_name)
+            # 更新当前课表名称
+            self.current_schedule = new_name
+            self.main_app.schedule["current_schedule"] = new_name
+            # 更新时间记录
+            self.schedule_times[new_name] = self.schedule_times.pop(old_name)
+            # 更新选择框
+            self.schedule_combobox['values'] = list(self.main_app.schedule["schedules"].keys())
+            self.schedule_combobox.set(new_name)
+            messagebox.showinfo("成功", "课表已重命名")
+        except Exception as e:
+            logger.log_error(e)
+            messagebox.showerror("错误", f"重命名失败: {str(e)}")
 
     def _generate_copy_name(self, original_name):
         """生成唯一的副本名称"""
