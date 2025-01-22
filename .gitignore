@@ -175,3 +175,4 @@ cython_debug/
 # Ignore config and schedule files
 config.json
 schedule.json
+develop_docs/天气功能实现.txt

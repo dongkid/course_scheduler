@@ -6,7 +6,9 @@ from constants import DEFAULT_GEOMETRY, CONFIG_FILE
 class ConfigHandler:
     def __init__(self):
         self.config = {}
+        self.initialize_config()  # 确保初始化时加载配置
         self.countdown_name = "高考"
+        self.heweather_api_key = ""
         self.countdown_date = datetime(datetime.now().year + 1, 6, 7)
         self.course_duration = 40
         self.auto_start = False
@@ -37,6 +39,7 @@ class ConfigHandler:
                     self.config.get("countdown_date", f"{datetime.now().year + 1}-06-07"),
                     "%Y-%m-%d"
                 )
+                self.heweather_api_key = self.config.get("heweather_api_key", "")
                 self.course_duration = self.config.get("course_duration", 40)
                 self.auto_start = self.config.get("auto_start", False)
                 self.auto_complete_end_time = self.config.get("auto_complete_end_time", True)
@@ -52,7 +55,8 @@ class ConfigHandler:
                 self.schedule_size = self.config.get("schedule_size", 16)
                 self.transparent_background = self.config.get("transparent_background", False)
                 self.fullscreen_subtitle = self.config.get("fullscreen_subtitle", "祝考生考试顺利")
-                self.debug_mode = self.config.get("debug_mode", False)
+                # 优先读取debug_mode，兼容旧配置debug_enabled
+                self.debug_mode = self.config.get("debug_mode", self.config.get("debug_enabled", False))
         else:
             self.config = {"geometry": DEFAULT_GEOMETRY}
             self.geometry = DEFAULT_GEOMETRY
@@ -80,7 +84,7 @@ class ConfigHandler:
         self.config["countdown_name"] = self.countdown_name
         self.config["countdown_date"] = self.countdown_date.strftime("%Y-%m-%d")
         self.config["course_duration"] = self.course_duration
-        self.config["auto_start"] = self.auto_start
+        self.config["heweather_api_key"] = self.heweather_api_key
         self.config["auto_complete_end_time"] = self.auto_complete_end_time
         self.config["auto_calculate_next_course"] = self.auto_calculate_next_course
         self.config["break_duration"] = self.break_duration

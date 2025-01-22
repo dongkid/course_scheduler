@@ -341,6 +341,15 @@ class SettingsWindow:
             style="White.TCheckbutton")
         self.debug_check.pack(side=tk.LEFT, padx=5)
 
+        # 天气工具设置
+        weather_frame = ttk.LabelFrame(other_frame, text="天气工具设置", style="TFrame")
+        weather_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        ttk.Label(weather_frame, text="和风天气API Key:").grid(row=0, column=0, padx=5, pady=5)
+        self.heweather_key_entry = ttk.Entry(weather_frame, width=35)
+        self.heweather_key_entry.grid(row=0, column=1, padx=5, pady=5)
+        self.heweather_key_entry.insert(0, self.main_app.config_handler.heweather_api_key)
+
 
 
     def restart_ui(self) -> None:
@@ -373,6 +382,16 @@ class SettingsWindow:
         self.main_app.root.geometry(f"+{x}+{y}")
         self.main_app.config_handler.save_config()
     
+    def _save_heweather_key(self):
+        """保存和风天气API Key"""
+        try:
+            self.main_app.config_handler.heweather_api_key = self.heweather_key_entry.get()
+            self.main_app.config_handler.save_config()
+            messagebox.showinfo("成功", "API Key已保存")
+        except Exception as e:
+            logger.log_error(e)
+            messagebox.showerror("错误", "保存Key时发生错误")
+
     def apply_settings(self):
         try:
             # 应用排版设置
@@ -480,6 +499,9 @@ class SettingsWindow:
             
             # 应用全屏时间副标题设置
             self.main_app.config_handler.fullscreen_subtitle = self.fullscreen_subtitle_entry.get()
+            
+            # 保存和风天气API Key
+            self.main_app.config_handler.heweather_api_key = self.heweather_key_entry.get()
             
             self.main_app.config_handler.save_config()
             # 更新字体设置
