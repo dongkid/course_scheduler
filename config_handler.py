@@ -54,9 +54,22 @@ class ConfigHandler:
                 self.countdown_size = self.config.get("countdown_size", 18)
                 self.schedule_size = self.config.get("schedule_size", 16)
                 self.transparent_background = self.config.get("transparent_background", False)
-                self.fullscreen_subtitle = self.config.get("fullscreen_subtitle", "祝考生考试顺利")
-                # 优先读取debug_mode，兼容旧配置debug_enabled
-                self.debug_mode = self.config.get("debug_mode", self.config.get("debug_enabled", False))
+        self.fullscreen_subtitle = self.config.get("fullscreen_subtitle", "祝考生考试顺利")
+        # 优先读取debug_mode，兼容旧配置debug_enabled
+        self.debug_mode = self.config.get("debug_mode", self.config.get("debug_enabled", False))
+        
+        # 新增轮换配置
+        self.schedule_rotation_enabled = self.config.get("schedule_rotation_enabled", False)
+        self.rotation_schedule1 = self.config.get("rotation_schedule1", "")
+        self.rotation_schedule2 = self.config.get("rotation_schedule2", "")
+        rotation_start_str = self.config.get("rotation_start_date", datetime.now().strftime("%Y-%m-%d"))
+        try:
+            self.rotation_start_date = datetime.strptime(rotation_start_str, "%Y-%m-%d")
+        except ValueError:
+            self.rotation_start_date = datetime.now()
+            
+        if os.path.exists(CONFIG_FILE):
+            pass
         else:
             self.config = {"geometry": DEFAULT_GEOMETRY}
             self.geometry = DEFAULT_GEOMETRY
@@ -99,5 +112,11 @@ class ConfigHandler:
         self.config["transparent_background"] = self.transparent_background
         self.config["fullscreen_subtitle"] = self.fullscreen_subtitle
         self.config["debug_mode"] = self.debug_mode
+        # 新增轮换配置保存
+        self.config["schedule_rotation_enabled"] = self.schedule_rotation_enabled
+        self.config["rotation_schedule1"] = self.rotation_schedule1
+        self.config["rotation_schedule2"] = self.rotation_schedule2
+        self.config["rotation_start_date"] = self.rotation_start_date.strftime("%Y-%m-%d")
+        
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(self.config, f, ensure_ascii=False, indent=2)

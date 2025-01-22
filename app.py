@@ -68,6 +68,35 @@ class CourseScheduler:
                     }
                 else:
                     self.schedule = schedule_data
+
+            # 自动应用课表轮换逻辑
+            if self.config_handler.schedule_rotation_enabled:
+                try:
+                    # 计算当前周数
+                    start_date = self.config_handler.rotation_start_date.date()
+                    current_date = datetime.now().date()
+                    delta_weeks = (current_date - start_date).days // 7
+                    
+                    # 获取配置的课表
+                    schedule1 = self.config_handler.rotation_schedule1
+                    schedule2 = self.config_handler.rotation_schedule2
+                    
+                    # 确保课表存在
+                    valid_schedules = list(self.schedule["schedules"].keys())
+                    if schedule1 not in valid_schedules:
+                        schedule1 = valid_schedules[0] if valid_schedules else "default"
+                    if schedule2 not in valid_schedules:
+                        schedule2 = valid_schedules[-1] if valid_schedules else "default"
+                    
+                    # 根据周数切换课表
+                    if delta_weeks % 2 == 0:
+                        self.schedule["current_schedule"] = schedule1
+                    else:
+                        self.schedule["current_schedule"] = schedule2
+                        
+                except Exception as e:
+                    logger.log_error(f"课表轮换错误: {str(e)}")
+                    self.schedule["current_schedule"] = self.config_handler.rotation_schedule1
         else:
             # 初始化默认课表
             self.schedule = {

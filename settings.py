@@ -234,6 +234,41 @@ class SettingsWindow:
         self.break_duration_entry.grid(row=3, column=1, padx=5, pady=5)
         self.break_duration_entry.insert(0, str(self.main_app.config_handler.break_duration))
 
+        # 课表轮换设置
+        rotation_frame = ttk.LabelFrame(course_frame, text="课表轮换设置", style="TFrame")
+        rotation_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        # 启用轮换复选框
+        self.rotation_var = tk.BooleanVar(value=self.main_app.config_handler.schedule_rotation_enabled)
+        self.rotation_check = ttk.Checkbutton(
+            rotation_frame, 
+            text="启用每周课表轮换",
+            variable=self.rotation_var,
+            style="White.TCheckbutton"
+        )
+        self.rotation_check.grid(row=0, column=0, columnspan=2, sticky=tk.W)
+
+        # 课表选择
+        ttk.Label(rotation_frame, text="第一周课表:").grid(row=1, column=0, padx=5)
+        self.schedule1_var = tk.StringVar(value=self.main_app.config_handler.rotation_schedule1)
+        self.schedule1_combo = ttk.Combobox(
+            rotation_frame,
+            textvariable=self.schedule1_var,
+            values=list(self.main_app.schedule["schedules"].keys()),
+            state="readonly"
+        )
+        self.schedule1_combo.grid(row=1, column=1, padx=5, pady=2)
+
+        ttk.Label(rotation_frame, text="第二周课表:").grid(row=2, column=0, padx=5)
+        self.schedule2_var = tk.StringVar(value=self.main_app.config_handler.rotation_schedule2)
+        self.schedule2_combo = ttk.Combobox(
+            rotation_frame,
+            textvariable=self.schedule2_var,
+            values=list(self.main_app.schedule["schedules"].keys()),
+            state="readonly"
+        )
+        self.schedule2_combo.grid(row=2, column=1, padx=5, pady=2)
+
         # 倒计时与默认课表设置
         gaokao_frame = ttk.LabelFrame(course_frame, text="倒计时与默认课表", style="TFrame")
         gaokao_frame.pack(fill=tk.X, padx=10, pady=5)
@@ -314,6 +349,15 @@ class SettingsWindow:
         self.fullscreen_subtitle_entry.grid(row=0, column=1, padx=5, pady=5)
         self.fullscreen_subtitle_entry.insert(0, self.main_app.config_handler.fullscreen_subtitle)
 
+        # 天气工具设置
+        weather_frame = ttk.LabelFrame(tools_frame, text="天气工具设置", style="TFrame")
+        weather_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        ttk.Label(weather_frame, text="和风天气API Key:").grid(row=0, column=0, padx=5, pady=5)
+        self.heweather_key_entry = ttk.Entry(weather_frame, width=35)
+        self.heweather_key_entry.grid(row=0, column=1, padx=5, pady=5)
+        self.heweather_key_entry.insert(0, self.main_app.config_handler.heweather_api_key)
+
     def _create_other_tab(self) -> None:
         """创建其他设置标签页"""
         other_frame = ttk.Frame(self.notebook, style="TFrame")
@@ -340,16 +384,6 @@ class SettingsWindow:
             variable=self.debug_var,
             style="White.TCheckbutton")
         self.debug_check.pack(side=tk.LEFT, padx=5)
-
-        # 天气工具设置
-        weather_frame = ttk.LabelFrame(other_frame, text="天气工具设置", style="TFrame")
-        weather_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        ttk.Label(weather_frame, text="和风天气API Key:").grid(row=0, column=0, padx=5, pady=5)
-        self.heweather_key_entry = ttk.Entry(weather_frame, width=35)
-        self.heweather_key_entry.grid(row=0, column=1, padx=5, pady=5)
-        self.heweather_key_entry.insert(0, self.main_app.config_handler.heweather_api_key)
-
 
 
     def restart_ui(self) -> None:
@@ -502,6 +536,11 @@ class SettingsWindow:
             
             # 保存和风天气API Key
             self.main_app.config_handler.heweather_api_key = self.heweather_key_entry.get()
+            
+            # 保存课表轮换设置
+            self.main_app.config_handler.schedule_rotation_enabled = self.rotation_var.get()
+            self.main_app.config_handler.rotation_schedule1 = self.schedule1_var.get()
+            self.main_app.config_handler.rotation_schedule2 = self.schedule2_var.get()
             
             self.main_app.config_handler.save_config()
             # 更新字体设置
