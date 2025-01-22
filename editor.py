@@ -89,12 +89,50 @@ class EditorWindow:
         # 添加新课表按钮
         ttk.Button(selector_frame, text="+", command=self._add_new_schedule, width=3, style="Small.TButton").pack(side=tk.LEFT, padx=5)
         
+        # 添加复制课表按钮
+        self.copy_button = ttk.Button(selector_frame, text="⧉", command=self._copy_schedule, width=3, style="Small.TButton")
+        self.copy_button.pack(side=tk.LEFT, padx=5)
+        
         # 添加删除课表按钮
         self.delete_button = ttk.Button(selector_frame, text="-", command=self._delete_schedule, width=3, style="Small.TButton")
         self.delete_button.pack(side=tk.LEFT, padx=5)
         
         # 绑定课表切换事件
         self.schedule_combobox.bind("<<ComboboxSelected>>", self._on_schedule_change)
+
+    def _generate_copy_name(self, original_name):
+        """生成唯一的副本名称"""
+        base_name = f"{original_name}_副本"
+        counter = 1
+        new_name = base_name
+        while new_name in self.main_app.schedule["schedules"]:
+            new_name = f"{base_name}{counter}"
+            counter += 1
+        return new_name
+
+    def _copy_schedule(self):
+        """复制当前课表"""
+        current_name = self.schedule_var.get()
+        new_name = self._generate_copy_name(current_name)
+        
+        # 深拷贝课表数据
+        original_schedule = self.main_app.schedule["schedules"][current_name]
+        new_schedule = {
+            str(day): [course.copy() for course in courses] 
+            for day, courses in original_schedule.items()
+        }
+        
+        # 添加新课表
+        self.main_app.schedule["schedules"][new_name] = new_schedule
+        self.schedule_times[new_name] = self.schedule_times[current_name].copy()
+        
+        # 更新选择框
+        self.schedule_combobox['values'] = list(self.main_app.schedule["schedules"].keys())
+        self.schedule_combobox.set(new_name)
+        self.current_schedule = new_name
+        self.main_app.schedule["current_schedule"] = new_name
+        self._update_ui_with_new_schedule()
+        self._reset_modified_flag()
 
     def _add_new_schedule(self):
         """添加新课表"""
