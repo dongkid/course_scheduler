@@ -31,20 +31,60 @@ class WeatherAPI:
             logger.log_debug(f"请求头: {headers}")
             logger.log_debug(f"参数: {params}")
             response = requests.get(self.geo_url, headers=headers, params=params, timeout=10)
-            response.raise_for_status()
+            http_status = response.status_code
             data = response.json()
             if not isinstance(data, dict):
                 raise ValueError("Invalid API response format")
-            if data.get("code") == "200" and data.get("location"):
-                return data["location"][0]["id"]
                 
-            error_msg = f"地区查询失败: code={data.get('code')}, message={data.get('message')}"
-            logger.log_error(error_msg)
-            messagebox.showerror("错误", "地区查询失败，请检查地区名称是否正确\n错误信息: " + error_msg)
+            # 添加HTTP状态码处理
+            # 地理API特定HTTP错误映射
+            HTTP_ERROR_MAP = {
+                400: "请求参数错误（请检查地区名称格式）",
+                401: "API密钥无效或未经授权",
+                403: "访问权限受限（请检查套餐类型）",
+                404: "指定的地区不存在",
+                429: "请求次数超过限制",
+                500: "和风天气服务器内部错误"
+            }
+            if http_status != 200:
+                error_msg = HTTP_ERROR_MAP.get(http_status, f"未知HTTP错误({http_status})")
+                logger.log_error(f"HTTP错误 [{http_status}]: {error_msg}")
+                messagebox.showerror("HTTP错误", f"{error_msg}\n请检查API地址或网络连接")
+                return None
+                
+            error_code = data.get("code")
+            if error_code == "200" and data.get("location"):
+                return data["location"][0]["id"]
+            
+            # 错误码映射表
+            ERROR_CODES = {
+                "400": "请求参数错误，请检查地区名称格式",
+                "401": "API密钥无效或过期，请检查配置",
+                "402": "账户余额不足，请及时充值",
+                "403": "访问权限受限，请检查套餐权限",
+                "404": "指定的地区不存在",
+                "429": "请求过于频繁，请稍后重试",
+                "500": "服务器内部错误，请稍后再试"
+            }
+            
+            # 优先使用v2错误信息
+            if "error" in data:
+                error_detail = f"{data['error'].get('title', '')}: {data['error'].get('detail', '')}"
+                invalid_params = ", ".join(data['error'].get('invalidParams', []))
+                if invalid_params:
+                    error_detail += f"\n无效参数: {invalid_params}"
+            else:
+                error_detail = ERROR_CODES.get(error_code, "未知错误")
+            
+            error_msg = f"API请求失败 [代码:{error_code}]\n{error_detail}"
+            logger.log_error(f"地区查询失败: {error_msg}")
+            messagebox.showerror("请求错误", error_msg)
             return None
         except requests.exceptions.RequestException as e:
-            messagebox.showerror("错误", f"网络请求失败：{e}")
-            logger.log_error(f"WeatherAPI请求异常：{str(e)}")
+            http_status = getattr(e.response, 'status_code', '未知')
+            error_msg = f"网络请求失败 [HTTP:{http_status}]\n{str(e)}"
+            messagebox.showerror("网络错误", error_msg)
+            logger.log_error(f"WeatherAPI请求异常: {error_msg}")
             return None
     
     def get_3d_weather(self, location_id):
@@ -69,16 +109,66 @@ class WeatherAPI:
             logger.log_debug(f"最终请求参数: {params}")
             
             response = requests.get(url, params=params, timeout=10)
-            logger.log_debug(f"响应状态码: {response.status_code}")
+            http_status = response.status_code
+            logger.log_debug(f"响应状态码: {http_status}")
             logger.log_debug(f"原始响应内容: {response.text[:500]}")  # 截取前500字符避免日志过大
             
-            response.raise_for_status()
+            # 预处理HTTP错误
+            HTTP_ERROR_MAP = {
+                400: "请求参数错误",
+                401: "未经授权",
+                403: "访问被拒绝",
+                404: "API端点不存在",
+                429: "请求次数超限",
+                500: "服务器内部错误"
+            }
+            if http_status != 200:
+                error_msg = HTTP_ERROR_MAP.get(http_status, f"未知HTTP错误({http_status})")
+                logger.error(f"天气API HTTP错误 [{http_status}]: {error_msg}")
+                messagebox.showerror("HTTP错误", f"{error_msg}\n请检查API配置")
+                return None
+                
             data = response.json()
             logger.log_debug(f"解析后的数据: {data}")
             
-            if data["code"] == "200":
+            error_code = data.get("code")
+            if error_code == "200":
                 return data["daily"]
-            messagebox.showwarning("警告", "天气数据获取失败")
+            
+            # 天气API错误码处理
+            WEATHER_ERRORS = {
+                "204": "该地区暂无天气数据",
+                "400": "请求参数错误，请检查位置ID",
+                "401": "API密钥验证失败",
+                "402": "账户额度不足，请续费",
+                "403": "无权限访问此数据（可能包含：额度用尽/套餐权限不足/安全限制）",
+                "404": "天气数据不存在",
+                "429": "请求超限（每分钟/每日/每月），请降低频率",
+                "500": "服务器内部错误，请稍后重试",
+                # v2错误码处理
+                "NO_CREDIT": "账户额度不足，请续费（错误码v2）",
+                "SECURITY_RESTRICTION": "安全限制，请检查请求频率和权限（错误码v2）",
+                "DATA_NOT_AVAILABLE": "该地区数据不可用（错误码v2）"
+            }
+            
+            # 处理v2错误格式
+            error_detail = ""
+            if "error" in data:
+                error_obj = data["error"]
+                error_detail = f"{error_obj.get('title', '')}\n{error_obj.get('detail', '')}"
+                if error_obj.get('type'):
+                    error_detail += f"\n参考文档: {error_obj['type']}"
+                if error_obj.get('invalidParams'):
+                    error_detail += f"\n无效参数: {', '.join(error_obj['invalidParams'])}"
+            else:
+                error_detail = WEATHER_ERRORS.get(str(error_code), "未知错误，请检查API响应")
+            
+            # 添加HTTP状态码信息
+            http_status = getattr(response, 'status_code', '未知')
+            full_error_msg = f"天气请求失败 [HTTP:{http_status} 代码:{error_code}]\n{error_detail}"
+            
+            logger.log_error(full_error_msg)
+            messagebox.showerror("请求错误", full_error_msg)
             return None
         except requests.exceptions.RequestException as e:
             messagebox.showerror("错误", f"天气请求失败：{e}")

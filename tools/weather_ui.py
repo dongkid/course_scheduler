@@ -8,12 +8,17 @@ class WeatherUI(tk.Toplevel):
         super().__init__(master)
         self.api = api
         self.current_location = "北京"
+        self.configure(background='white')  # 设置主窗口背景
+        # 创建白色背景样式
+        style = ttk.Style()
+        style.configure('White.TFrame', background='white')
+        style.configure('White.TLabel', background='white')
         self.init_ui()
         self.load_default_location()
 
     def init_ui(self):
         self.title("天气预报")
-        self.minsize(400, 400)
+        self.minsize(600, 500)  # 调整窗口最小尺寸以适应更多内容
         
         main_frame = ttk.Frame(self)
         main_frame.pack(fill='both', expand=True, padx=10, pady=10)
@@ -22,8 +27,7 @@ class WeatherUI(tk.Toplevel):
         location_frame = ttk.Frame(main_frame)
         location_frame.pack(fill='x', pady=5)
         
-        self.location_combo = ttk.Combobox(location_frame, values=["北京", "上海", "广州", "深圳", "杭州", "南京"])
-        self.location_combo.state(["readonly"])
+        self.location_combo = ttk.Combobox(location_frame)
         self.location_combo.pack(side='left', fill='x', expand=True, padx=(0,5))
         
         self.search_btn = ttk.Button(location_frame, text="查询", command=self.search_weather)
@@ -33,21 +37,49 @@ class WeatherUI(tk.Toplevel):
         self.weather_info = ttk.Frame(main_frame)
         self.weather_info.pack(fill='both', expand=True)
         
-        # 初始化三天天气展示区域
-        self.day_labels = {
-            0: ttk.Label(self.weather_info),
-            1: ttk.Label(self.weather_info),
-            2: ttk.Label(self.weather_info)
+        # 初始化三天天气表格（使用ttk.Treeview）
+        self.weather_tables = {
+            0: ttk.Treeview(self.weather_info, height=8, columns=('value'), show='tree'),
+            1: ttk.Treeview(self.weather_info, height=8, columns=('value'), show='tree'),
+            2: ttk.Treeview(self.weather_info, height=8, columns=('value'), show='tree')
         }
         
-        ttk.Label(self.weather_info, text="今天天气：").grid(row=0, column=0, sticky='e', padx=5, pady=2)
-        self.day_labels[0].grid(row=0, column=1, sticky='w', padx=5, pady=2)
+        # 配置表格样式
+        style = ttk.Style()
+        style.configure('Weather.Treeview', 
+                       rowheight=25, 
+                       font=('Arial', 9),
+                       background='white',
+                       borderwidth=1,
+                       relief='solid',
+                       bordercolor='white')
+        style.configure('Weather.Treeview.Heading', 
+                       font=('Arial', 9, 'bold'),
+                       background='white',
+                       borderwidth=0)
+        style.layout('Weather.Treeview', [
+            ('Treeview.border', {'sticky': 'nswe', 'children': [
+                ('Treeview.treearea', {'sticky': 'nswe'})
+            ]})
+        ])  # 保留边框结构
+        style.map('Weather.Treeview',
+                bordercolor=[('!focus', 'white')],
+                lightcolor=[('!focus', 'white')],
+                darkcolor=[('!focus', 'white')])
+
+        # 调整网格布局
+        self.weather_info.columnconfigure(1, weight=1)
         
-        ttk.Label(self.weather_info, text="明天天气：").grid(row=1, column=0, sticky='e', padx=5, pady=2)
-        self.day_labels[1].grid(row=1, column=1, sticky='w', padx=5, pady=2)
+        # 表头
+        ttk.Label(self.weather_info, text="日期", font=('Arial', 9, 'bold')).grid(row=0, column=0, padx=5, pady=2)
+        ttk.Label(self.weather_info, text="天气详情", font=('Arial', 9, 'bold')).grid(row=0, column=1, padx=5, pady=2)
         
-        ttk.Label(self.weather_info, text="后天天气：").grid(row=2, column=0, sticky='e', padx=5, pady=2)
-        self.day_labels[2].grid(row=2, column=1, sticky='w', padx=5, pady=2)
+        # 配置三天天气行
+        for i in range(0, 3):
+            ttk.Label(self.weather_info, text=["今天", "明天", "后天"][i]+"：").grid(row=i+1, column=0, sticky='ne', padx=5, pady=2)
+            
+            # 表格布局和配置
+            self.weather_tables[i].grid(row=i+1, column=1, sticky='nsew', padx=5, pady=2)
 
     def load_default_location(self):
         """加载默认地区"""
@@ -81,11 +113,35 @@ class WeatherUI(tk.Toplevel):
             
             for day_data in data:
                 if day_data["fxDate"] == date_str:
-                    text = (
-                        f"{day_data['textDay']}转{day_data['textNight']}\n"
-                        f"温度：{day_data['tempMin']}℃ ~ {day_data['tempMax']}℃\n"
-                        f"风速：{day_data['windSpeedDay']}级\n"
-                        f"湿度：{day_data['humidity']}%"
+                    text_content = (
+                        f"📅 日期：{day_data['fxDate']}\n"
+                        f"🌤 白天：{day_data['textDay']}｜🌙 夜间：{day_data['textNight']}\n"
+                        f"🌡 温度：{day_data['tempMin']}℃ ~ {day_data['tempMax']}℃\n"
+                        f"💨 风速：{day_data['windSpeedDay']}级\n"
+                        f"💧 湿度：{day_data['humidity']}%\n\n"
+                        f"🌅 日出：{day_data.get('sunrise', '--')}\n"
+                        f"🌇 日落：{day_data.get('sunset', '--')}\n"
+                        f"☔ 降水：{day_data.get('precip', '0.0')}mm\n"
+                        f"☀ 紫外线：{day_data['uvIndex']}级\n"
+                        f"📊 气压：{day_data['pressure']}hPa\n"
+                        f"👁 能见度：{day_data['vis']}km"
                     )
-                    self.day_labels[i].config(text=text)
+                    
+                    # 清空并更新表格数据
+                    self.weather_tables[i].delete(*self.weather_tables[i].get_children())
+                    entries = [
+                        ("📅 日期", day_data['fxDate']),
+                        ("🌤 白天/夜间", f"{day_data['textDay']}｜{day_data['textNight']}"),
+                        ("🌡 温度", f"{day_data['tempMin']}℃ ~ {day_data['tempMax']}℃"),
+                        ("💨 风速", f"{day_data['windSpeedDay']}级"),
+                        ("💧 湿度", f"{day_data['humidity']}%"),
+                        ("🌅 日出", day_data.get('sunrise', '--')),
+                        ("🌇 日落", day_data.get('sunset', '--')),
+                        ("☔ 降水", f"{day_data.get('precip', '0.0')}mm"),
+                        ("☀ 紫外线", f"{day_data['uvIndex']}级"),
+                        ("📊 气压", f"{day_data['pressure']}hPa"),
+                        ("👁 能见度", f"{day_data['vis']}km")
+                    ]
+                    for item in entries:
+                        self.weather_tables[i].insert('', 'end', text=item[0], values=(item[1],))
                     break
