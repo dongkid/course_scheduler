@@ -134,11 +134,11 @@ class CourseScheduler:
             self.root,
             {
                 "编辑课表": self.open_editor,
+                "小工具": self._show_tools_window,
                 "设置": self.open_settings,
                 "关于": self.open_about,
-                "重启主界面": self.restart_ui,
-                "退出程序": self.root.quit,
-                "小工具": self._show_tools_window
+                "重启程序": self.restart_program,
+                "退出程序": self.root.quit
             }
         )
         
@@ -224,8 +224,9 @@ class CourseScheduler:
 
     def _start_update_loop(self) -> None:
         """启动界面更新循环"""
+        self.timer_ids = []  # 存储定时器ID
         self.update_display()
-        self.root.after(1000, self.update_display)
+        self.timer_ids.append(self.root.after(1000, self.update_display))
     
     def update_display(self) -> None:
         """更新主界面显示内容"""
@@ -395,42 +396,24 @@ class CourseScheduler:
 
     def _schedule_next_update(self) -> None:
         """安排下一次界面更新"""
-        self.root.after(1000, self.update_display)
+        timer_id = self.root.after(1000, self.update_display)
+        if hasattr(self, 'timer_ids'):
+            self.timer_ids.append(timer_id)
     
-    def restart_ui(self) -> None:
-        """重启主界面"""
-        # 清空课程标签列表
-        self.course_labels = []
-        
-        # 销毁现有界面组件（包括schedule_frame）
-        for widget in self.root.winfo_children():
-            widget.destroy()
-        
-        # 显式删除框架引用
-        if hasattr(self, 'schedule_frame'):
-            del self.schedule_frame
-        if hasattr(self, 'button_frame'):
-            del self.button_frame
+    def restart_program(self) -> None:
+        """彻底重启应用程序"""
+        # 取消所有待处理的定时器事件
+        for timer_id in self.root.tk.eval('after info').split():
+            self.root.after_cancel(timer_id)
             
-        # 重新初始化界面（包含_create_schedule_display的原始调用）
-        self._initialize_ui()
+        # 销毁主窗口
+        self.root.destroy()
         
-        # 应用字体设置并强制布局更新
-        self._adjust_ui_layout()
-        self.root.update_idletasks()  # 立即刷新布局
+        # 创建新的应用实例
+        new_app = CourseScheduler()
         
-        # 确保主菜单已重新初始化
-        self.main_menu = MainMenu(
-            self.root,
-            {
-                "编辑课表": self.open_editor,
-                "设置": self.open_settings,
-                "关于": self.open_about,
-                "重启主界面": self.restart_ui,
-                "退出程序": self.root.quit,
-                "小工具": self._show_tools_window
-            }
-        )
+        # 启动新实例的主循环
+        new_app.root.mainloop()
     
     
     def open_editor(self):
