@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from threading import Thread
 import datetime
-from threading import Thread
+from logger import logger
 class WeatherUI(tk.Toplevel):
     def __init__(self, api, master=None):
         super().__init__(master)
@@ -83,7 +83,19 @@ class WeatherUI(tk.Toplevel):
 
     def load_default_location(self):
         """加载默认地区"""
-        self.search_weather()
+        def fetch_ip_location():
+            location = self.api.get_location_by_ip()
+            if location:
+                logger.log_debug(f"自动定位结果: {location}")
+                # 同时显示详细地址和保留原始城市名称
+                self.after(0, lambda: self.location_combo.set(location))
+                self.search_weather()
+            else:
+                logger.log_warning("IP定位失败，使用默认地址北京")
+                self.after(0, lambda: self.location_combo.set("北京"))
+                self.search_weather()
+
+        Thread(target=fetch_ip_location).start()
 
     def search_weather(self):
         """执行天气查询"""

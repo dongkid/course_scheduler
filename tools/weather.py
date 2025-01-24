@@ -87,6 +87,49 @@ class WeatherAPI:
             logger.log_error(f"WeatherAPI请求异常: {error_msg}")
             return None
     
+    def get_location_by_ip(self):
+        """通过IP地址获取地理位置"""
+        try:
+            request_url = "https://2024.ip138.com/"
+            logger.log_debug(f"开始IP定位请求: {request_url}")
+            
+            ip_response = requests.get(request_url, timeout=5, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            })
+            logger.log_debug(f"IP定位响应状态码: {ip_response.status_code}")
+            
+            if ip_response.status_code == 200:
+                # 使用正则表达式提取地理位置信息
+                import re
+                match = re.search(r"来自：([^\n<]+)", ip_response.text)
+                if match:
+                    location_str = match.group(1).strip()
+                    # 解析格式
+                    parts = location_str.split()
+                    if len(parts) >= 2:
+                        # 提取省份、城市、区县信息
+                        area = parts[0][2:]
+                        operator = parts[1]  # 运营商信息
+                        
+                        # 解析省市区（示例：广东深圳福田）
+                        province = area[:2] + "省"
+                        city = area[2:4] + "市"
+                        district = area[4:] if len(area) > 4 else ""
+                        
+                        detailed_location = f"{province} {city} {district}".strip()
+                        
+                        logger.log_debug(f"IP定位成功详情: {location_str}")
+                        logger.log_debug(f"解析结果: 省份={province} 城市={city} 区/县={district}")
+                        logger.log_debug(f"网络运营商: {operator}")
+                        
+                        return detailed_location
+                    
+            logger.log_warning(f"IP定位失败: HTTP {ip_response.status_code}")
+            return None
+        except Exception as e:
+            logger.log_error(f"IP定位请求异常: {str(e)}", exc_info=True)
+            return None
+
     def get_3d_weather(self, location_id):
         """获取三天天气预报"""
         headers = {
