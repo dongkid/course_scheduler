@@ -402,18 +402,24 @@ class CourseScheduler:
     
     def restart_program(self) -> None:
         """彻底重启应用程序"""
-        # 取消所有待处理的定时器事件
-        for timer_id in self.root.tk.eval('after info').split():
+        import sys, os
+        
+        # 1. 清理所有定时器
+        for timer_id in getattr(self, 'timer_ids', []):
             self.root.after_cancel(timer_id)
             
-        # 销毁主窗口
+        # 2. 销毁所有子窗口
+        for window in [self.editor_window, self.settings_window, self.about_window]:
+            if window and window.window.winfo_exists():
+                window.window.destroy()
+                
+        # 3. 销毁主窗口并退出主循环
+        self.root.quit()
         self.root.destroy()
         
-        # 创建新的应用实例
-        new_app = CourseScheduler()
-        
-        # 启动新实例的主循环
-        new_app.root.mainloop()
+        # 4. 彻底重启进程
+        python = sys.executable
+        os.execl(python, python, *sys.argv)
     
     
     def open_editor(self):
