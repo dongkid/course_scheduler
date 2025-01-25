@@ -1,11 +1,13 @@
 import json
 import os
+import threading
 from datetime import datetime
 from constants import DEFAULT_GEOMETRY, CONFIG_FILE
 
 class ConfigHandler:
     def __init__(self):
         self.config = {}
+        self.config_loaded = threading.Event()  # 新增配置加载完成事件
         self.initialize_config()  # 确保初始化时加载配置
         self.countdown_name = "高考"
         self.heweather_api_key = ""
@@ -68,6 +70,9 @@ class ConfigHandler:
         except ValueError:
             self.rotation_start_date = datetime.now()
         self.last_weather_location = self.config.get("last_weather_location", "")  # 新增天气位置记忆
+        
+        # 确保所有情况都触发配置加载事件
+        self.config_loaded.set()
         
         if os.path.exists(CONFIG_FILE):
             pass

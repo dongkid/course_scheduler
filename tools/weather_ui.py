@@ -90,7 +90,7 @@ class WeatherUI(tk.Toplevel):
             if saved_location:
                 logger.log_debug(f"使用保存的地理位置: {saved_location}")
                 self.after(0, lambda: self.location_combo.set(saved_location))
-                sleep(0.5)
+                # sleep(0.5)
                 self.search_weather()
                 return
 
