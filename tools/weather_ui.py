@@ -1,3 +1,4 @@
+from time import sleep
 import tkinter as tk
 from tkinter import ttk, messagebox
 from threading import Thread
@@ -84,10 +85,22 @@ class WeatherUI(tk.Toplevel):
     def load_default_location(self):
         """加载默认地区"""
         def fetch_ip_location():
+            # 优先使用保存的位置
+            saved_location = self.api.config.last_weather_location
+            if saved_location:
+                logger.log_debug(f"使用保存的地理位置: {saved_location}")
+                self.after(0, lambda: self.location_combo.set(saved_location))
+                sleep(0.5)
+                self.search_weather()
+                return
+
+            # 没有保存位置时进行网络定位
             location = self.api.get_location_by_ip()
             if location:
                 logger.log_debug(f"自动定位结果: {location}")
-                # 同时显示详细地址和保留原始城市名称
+                # 保存新定位结果
+                self.api.config.last_weather_location = location
+                self.api.config.save_config()
                 self.after(0, lambda: self.location_combo.set(location))
                 self.search_weather()
             else:
@@ -100,9 +113,30 @@ class WeatherUI(tk.Toplevel):
     def search_weather(self):
         """执行天气查询"""
         location = self.location_combo.get().strip()
-        if not location:
-            messagebox.showwarning("警告", "请输入地区名称")
-            return
+        
+        # 处理提示框内容为空的情况（包括全空格情况）
+        if not location or location.isspace():
+            # 询问是否使用网络定位
+            use_geo = messagebox.askyesno("定位确认", "是否使用网络定位当前位置？")
+            if use_geo:
+                ip_location = self.api.get_location_by_ip()
+                if ip_location:
+                    location = ip_location
+                    self.location_combo.set(location)
+                else:
+                    messagebox.showwarning("警告", "定位失败，请手动输入地区名称")
+                    return
+            else:
+                # messagebox.showwarning("提示", "请输入查询地区名称")
+                # 保存空值并继续查询
+                self.api.config.last_weather_location = ""
+                self.api.config.save_config()
+                return
+
+        # 保存新的查询位置
+        if location != self.api.config.last_weather_location:
+            self.api.config.last_weather_location = location
+            self.api.config.save_config()
 
         def fetch_weather():
             location_id = self.api.get_location_id(location)

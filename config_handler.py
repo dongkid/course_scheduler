@@ -67,7 +67,8 @@ class ConfigHandler:
             self.rotation_start_date = datetime.strptime(rotation_start_str, "%Y-%m-%d")
         except ValueError:
             self.rotation_start_date = datetime.now()
-            
+        self.last_weather_location = self.config.get("last_weather_location", "")  # 新增天气位置记忆
+        
         if os.path.exists(CONFIG_FILE):
             pass
         else:
@@ -93,6 +94,9 @@ class ConfigHandler:
     
     def save_config(self):
         """保存当前配置到文件"""
+        from logger import logger
+        logger.log_debug(f"开始保存配置，最后天气位置: {self.last_weather_location}")
+        
         self.config["geometry"] = self.geometry
         self.config["countdown_name"] = self.countdown_name
         self.config["countdown_date"] = self.countdown_date.strftime("%Y-%m-%d")
@@ -117,6 +121,13 @@ class ConfigHandler:
         self.config["rotation_schedule1"] = self.rotation_schedule1
         self.config["rotation_schedule2"] = self.rotation_schedule2
         self.config["rotation_start_date"] = self.rotation_start_date.strftime("%Y-%m-%d")
+        self.config["last_weather_location"] = self.last_weather_location
         
-        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-            json.dump(self.config, f, ensure_ascii=False, indent=2)
+        try:
+            logger.log_debug(f"正在写入配置文件: {CONFIG_FILE}")
+            logger.log_debug(f"完整配置内容: {self.config}")
+            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+                json.dump(self.config, f, ensure_ascii=False, indent=2)
+            logger.log_debug("配置保存成功")
+        except Exception as e:
+            logger.log_error(f"保存配置失败: {str(e)}", exc_info=True)
