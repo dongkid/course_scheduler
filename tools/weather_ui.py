@@ -86,16 +86,24 @@ class WeatherUI(tk.Toplevel):
         """加载默认地区"""
         def fetch_ip_location():
             # 优先使用保存的位置
-            saved_location = self.api.config.last_weather_location
-            if saved_location:
-                logger.log_debug(f"使用保存的地理位置: {saved_location}")
-                self.after(0, lambda: self.location_combo.set(saved_location))
-                # sleep(0.5)
-                self.search_weather()
-                return
+            try:
+                # 等待配置加载完成（最多等待5秒）
+                if not self.api.config.config_loaded.wait(timeout=5):
+                    logger.log_warning("配置加载超时，使用默认配置")
+                    self.api.config.last_weather_location = ""
+                
+                saved_location = self.api.config.last_weather_location
+                if saved_location:
+                    logger.log_debug(f"使用保存的地理位置: {saved_location}")
+                    self.after(0, lambda: self.location_combo.set(saved_location))
+                    self.after(0, self.search_weather)
+                    return
 
-            # 没有保存位置时进行网络定位
-            location = self.api.get_location_by_ip()
+                # 没有保存位置时进行网络定位
+                location = self.api.get_location_by_ip()
+            except Exception as e:
+                logger.log_error(f"定位初始化失败: {str(e)}")
+                self.after(0, lambda: self.location_combo.set("北京"))
             if location:
                 logger.log_debug(f"自动定位结果: {location}")
                 # 保存新定位结果
