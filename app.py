@@ -50,8 +50,27 @@ class CourseScheduler:
         root.title("课程表")
         root.overrideredirect(True)  # 无边框
         root.resizable(False, False)  # 固定比例
-        root.protocol("WM_DELETE_WINDOW", lambda: None)  # 禁用关闭按钮
+        root.protocol("WM_DELETE_WINDOW", self.cleanup_resources)  # 退出时清理资源
         return root
+
+    def cleanup_resources(self):
+        """清理所有资源"""
+        try:
+            # 关闭所有子窗口
+            for window in [self.editor_window, self.settings_window, self.about_window]:
+                if window and window.window.winfo_exists():
+                    window.window.destroy()
+            
+            # 取消所有定时器
+            for timer_id in getattr(self, 'timer_ids', []):
+                self.root.after_cancel(timer_id)
+            
+            # 销毁主窗口
+            self.root.destroy()
+        except Exception as e:
+            logger.log_error(f"清理资源时出错: {str(e)}")
+        finally:
+            os._exit(0)  # 确保完全退出进程
 
     def _initialize_schedule(self) -> None:
         """加载或初始化课程表数据"""

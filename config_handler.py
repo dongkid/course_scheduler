@@ -74,15 +74,21 @@ class ConfigHandler:
         # 确保所有情况都触发配置加载事件
         self.config_loaded.set()
         
-        if os.path.exists(CONFIG_FILE):
-            pass
-        else:
-            self.config = {"geometry": DEFAULT_GEOMETRY}
-            self.geometry = DEFAULT_GEOMETRY
-            self.countdown_name = "高考"
-            self.countdown_date = datetime(datetime.now().year + 1, 6, 7)
-            self.course_duration = 40
-            self.save_config()
+        if not os.path.exists(CONFIG_FILE):
+            # 直接创建默认配置文件
+            default_config = {
+                "geometry": DEFAULT_GEOMETRY,
+                "countdown_name": "高考",
+                "countdown_date": datetime(datetime.now().year + 1, 6, 7).strftime("%Y-%m-%d"),
+                "course_duration": 40,
+                "rotation_start_date": datetime.now().strftime("%Y-%m-%d")
+            }
+            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+                json.dump(default_config, f, ensure_ascii=False, indent=2)
+            
+            # 重新加载配置
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                self.config = json.load(f)
 
     def load_config(self):
         """加载配置文件"""
