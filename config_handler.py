@@ -30,8 +30,30 @@ class ConfigHandler:
         self.debug_mode = False
         self.geometry = None
 
+    def check_registry_auto_start(self):
+        """检查注册表中是否存在开机自启动项"""
+        try:
+            import winreg
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Run",
+                0, winreg.KEY_READ
+            )
+            value, _ = winreg.QueryValueEx(key, "CourseScheduler")
+            winreg.CloseKey(key)
+            return value.endswith("course_scheduler.exe")
+        except FileNotFoundError:
+            return False
+        except Exception as e:
+            from logger import logger
+            logger.log_error(f"注册表检查错误: {str(e)}")
+            return False
+
     def initialize_config(self):
         """加载或初始化配置文件"""
+        # 先检查注册表实际状态
+        self.auto_start = self.check_registry_auto_start()
+        
         if os.path.exists(CONFIG_FILE):
             with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
                 self.config = json.load(f)
@@ -149,6 +171,7 @@ class ConfigHandler:
             "countdown_date": self.countdown_date.strftime("%Y-%m-%d"),
             "course_duration": self.course_duration,
             "heweather_api_key": self.heweather_api_key,
+            "auto_start": self.auto_start,
             "auto_complete_end_time": self.auto_complete_end_time,
             "auto_calculate_next_course": self.auto_calculate_next_course,
             "break_duration": self.break_duration,

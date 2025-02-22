@@ -489,7 +489,9 @@ class SettingsWindow:
             self.main_app.config_handler.auto_start = self.auto_start_var.get()
             if self.main_app.config_handler.auto_start:
                 from auto_start import enable_auto_start
-                enable_auto_start("CourseScheduler", sys.executable)
+                # 处理打包后的路径问题
+                exe_path = sys.executable if not getattr(sys, 'frozen', False) else sys._MEIPASS + '/course_scheduler.exe'
+                enable_auto_start("CourseScheduler", exe_path)
             else:
                 from auto_start import disable_auto_start
                 disable_auto_start("CourseScheduler")

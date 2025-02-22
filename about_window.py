@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 import subprocess
 import sys
+import os
 from tkinter import PhotoImage
 from constants import APP_NAME, VERSION, PROJECT_URL
 
@@ -58,7 +59,7 @@ class AboutWindow:
         top_frame.pack(fill=tk.X, pady=(0, 3))
         
         try:
-            icon = PhotoImage(file=sys._MEIPASS + "/icon.png") if hasattr(sys, '_MEIPASS') else PhotoImage(file="res/icon.png")
+            icon = PhotoImage(file=os.path.join(sys._MEIPASS, 'res', 'icon.png')) if hasattr(sys, '_MEIPASS') else PhotoImage(file="res/icon.png")
             icon = icon.subsample(15, 15)  # 进一步缩小图标
             icon_label = tk.Label(top_frame, image=icon, bg="white")
             icon_label.image = icon
