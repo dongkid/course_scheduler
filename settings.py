@@ -413,6 +413,8 @@ class SettingsWindow:
         x = max(0, min(x, screen_width - window_width))
         y = max(0, min(y, screen_height - window_height))
         
+        # 更新geometry并保存
+        self.main_app.config_handler.geometry = f"{window_width}x{window_height}+{x}+{y}"
         self.main_app.root.geometry(f"+{x}+{y}")
         self.main_app.config_handler.save_config()
     
