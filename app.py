@@ -156,6 +156,7 @@ class CourseScheduler:
                 "小工具": self._show_tools_window,
                 "设置": self.open_settings,
                 "关于": self.open_about,
+                # 重启功能存在问题，暂时注释。
                 # "重启程序": self.restart_program,
                 "退出程序": self.root.quit
             }
