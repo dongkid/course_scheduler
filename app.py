@@ -51,6 +51,13 @@ class CourseScheduler:
         root.overrideredirect(True)  # 无边框
         root.resizable(False, False)  # 固定比例
         root.protocol("WM_DELETE_WINDOW", self.cleanup_resources)  # 退出时清理资源
+        
+        # 设置透明图标和窗口类型
+        # root.iconbitmap(default='res/icon.ico')  # 设置默认图标
+        root.attributes('-toolwindow', True)  # 设置为工具窗口样式
+        root.attributes('-topmost', True)  # 保持窗口在最前
+        root.after(100, lambda: root.attributes('-topmost', False))  # 短暂置顶后取消
+        
         return root
 
     def cleanup_resources(self):
@@ -323,7 +330,11 @@ class CourseScheduler:
             text=f"{course['start_time']} {course['name']}"
         )
         if hasattr(label, 'status_canvas'):
+            # 同时更新Canvas背景和圆形颜色
             label.status_canvas.config(bg=color)
+            label.status_canvas.itemconfig(label.status_canvas.oval_id, fill=color, outline=color)
+        # 提升该课程标签的显示层级
+        label.master.lift()  # 通过调整父容器的层级确保显示在最前   
 
     def _update_font_settings(self) -> None:
         """更新所有UI组件的字体设置"""
@@ -393,18 +404,18 @@ class CourseScheduler:
         
         status_canvas = tk.Canvas(
             course_frame,
-            width=10,  # 最小宽度
+            width=10,
             height=10,
             bg=color,
             highlightthickness=0
         )
-        # 绘制圆柱形
-        status_canvas.create_oval(0, 0, 10, 10, fill=color, outline=color)
+        # 保存圆形图形的ID以便后续更新
+        oval_id = status_canvas.create_oval(0, 0, 10, 10, fill=color, outline=color)
+        status_canvas.oval_id = oval_id  # 存储图形ID
         status_canvas.pack(side=tk.RIGHT, padx=5)
         label.status_canvas = status_canvas
         self.course_labels.append(label)
         
-        # 配置列权重
         self.schedule_frame.grid_columnconfigure(0, weight=1)
 
     def _remove_extra_labels(self, schedule: List[Dict[str, str]]) -> None:
