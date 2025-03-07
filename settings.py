@@ -13,6 +13,7 @@ class SettingsWindow:
         try:
             self.main_app = main_app
             self.window = self._create_window()
+            self.applying = False
             self._initialize_ui()
         except Exception as e:
             logger.log_error(e)
@@ -429,6 +430,9 @@ class SettingsWindow:
             messagebox.showerror("错误", "保存Key时发生错误")
 
     def apply_settings(self):
+        if self.applying:  # 如果正在处理，直接返回
+            return
+        self.applying = True  # 设置标志位为处理中
         try:
             # 应用排版设置
             try:
@@ -553,3 +557,5 @@ class SettingsWindow:
         except Exception as e:
             logger.log_error(e)
             messagebox.showerror("错误", "保存设置时发生错误")
+        finally:
+            self.applying = False  # 重置标志位
