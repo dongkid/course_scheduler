@@ -330,9 +330,16 @@ class CourseScheduler:
             text=f"{course['start_time']} {course['name']}"
         )
         if hasattr(label, 'status_canvas'):
-            # 同时更新Canvas背景和圆形颜色
+            # 根据当前字体大小更新色块尺寸
+            circle_size = int(self.config_handler.schedule_size * 1.2)
+            # 更新Canvas尺寸
+            label.status_canvas.config(width=circle_size, height=circle_size)
+            # 删除旧图形并创建新尺寸的圆形
+            label.status_canvas.delete(label.status_canvas.oval_id)
+            oval_id = label.status_canvas.create_oval(0, 0, circle_size, circle_size, fill=color, outline=color)
+            label.status_canvas.oval_id = oval_id
+            # 更新颜色
             label.status_canvas.config(bg=color)
-            label.status_canvas.itemconfig(label.status_canvas.oval_id, fill=color, outline=color)
         # 提升该课程标签的显示层级
         label.master.lift()  # 通过调整父容器的层级确保显示在最前   
 
@@ -343,6 +350,14 @@ class CourseScheduler:
             font=("微软雅黑", self.config_handler.font_size, "bold"),
             fg=self.config_handler.font_color
         )
+        
+        # 更新课程标签色块尺寸
+        if hasattr(self, 'course_labels'):
+            for label in self.course_labels:
+                if hasattr(label, 'status_canvas'):
+                    circle_size = int(self.config_handler.schedule_size * 1.2)
+                    label.status_canvas.config(width=circle_size, height=circle_size)
+                    label.status_canvas.coords(label.status_canvas.oval_id, 0, 0, circle_size, circle_size)
         
         # 更新倒计时显示
         self.countdown_label1.config(
@@ -402,15 +417,17 @@ class CourseScheduler:
         )
         label.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
+        # 根据字体大小计算色块尺寸
+        circle_size = int(self.config_handler.schedule_size * 1.2)
         status_canvas = tk.Canvas(
             course_frame,
-            width=10,
-            height=10,
+            width=circle_size,
+            height=circle_size,
             bg=color,
             highlightthickness=0
         )
         # 保存圆形图形的ID以便后续更新
-        oval_id = status_canvas.create_oval(0, 0, 10, 10, fill=color, outline=color)
+        oval_id = status_canvas.create_oval(0, 0, circle_size, circle_size, fill=color, outline=color)
         status_canvas.oval_id = oval_id  # 存储图形ID
         status_canvas.pack(side=tk.RIGHT, padx=5)
         label.status_canvas = status_canvas
