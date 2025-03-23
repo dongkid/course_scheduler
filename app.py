@@ -1,6 +1,7 @@
 from typing import Dict, List, Callable
 import tkinter as tk
 import os
+import sys
 import json
 from datetime import datetime, date
 from constants import SCHEDULE_FILE, WEEKDAYS
@@ -10,8 +11,9 @@ from main_menu import MainMenu
 
 class CourseScheduler:
     """课程表主应用类"""
-    def __init__(self):
+    def __init__(self, startup_action=None):
         """初始化课程表应用"""
+        self.startup_action = startup_action
         try:
             logger.log_debug("Initializing CourseScheduler application")
             # 先初始化配置
@@ -23,7 +25,9 @@ class CourseScheduler:
             # 创建主窗口并应用配置
             self.root = self._create_root_window()
             logger.log_debug("Main window created")
+            # 应用窗口尺寸并强制更新布局
             self.root.geometry(self.config_handler.geometry)
+            self.root.update_idletasks()  # 立即应用窗口布局
             
             # 初始化其他成员变量
             self.schedule: Dict[str, List[Dict[str, str]]] = {}
@@ -33,6 +37,7 @@ class CourseScheduler:
             self.settings_window = None
             self.about_window = None
             self.main_menu = None
+            self.was_iconic = False  # 初始化窗口状态跟踪属性
             
             logger.log_debug("Initializing schedule")
             self._initialize_schedule()
@@ -40,6 +45,10 @@ class CourseScheduler:
             logger.log_debug("Initializing UI")
             self._initialize_ui()
             logger.log_debug("UI initialized")
+            
+            # 执行启动动作
+            if self.startup_action == 'open_settings':
+                self.open_settings()
         except Exception as e:
             logger.log_error(e)
             raise
@@ -53,11 +62,16 @@ class CourseScheduler:
         root.protocol("WM_DELETE_WINDOW", self.cleanup_resources)  # 退出时清理资源
         
         # 设置透明图标和窗口类型
-        # root.iconbitmap(default='res/icon.ico')  # 设置默认图标
-        root.attributes('-toolwindow', True)  # 设置为工具窗口样式
-        root.attributes('-topmost', True)  # 保持窗口在最前
-        root.after(100, lambda: root.attributes('-topmost', False))  # 短暂置顶后取消
+        # 使用绝对路径并处理打包后的资源路径
+        base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+        icon_path = os.path.join(base_path, 'res', 'icon.ico')
+        root.iconbitmap(default=icon_path)
+        root.wm_iconbitmap(icon_path)
         
+        #窗口层级控制
+        root.attributes('-toolwindow', True)  # 设置为工具窗口样式
+        root.attributes('-topmost', True)
+        root.after(100, lambda: root.attributes('-topmost', False))
         return root
 
     def cleanup_resources(self):
@@ -196,15 +210,57 @@ class CourseScheduler:
         """处理时间标签点击事件"""
         from tkinter import messagebox
         from tools.fullscreen_time import FullscreenTimeWindow
+        from tools.weather_ui import WeatherUI
+        from tools.weather import WeatherAPI
         
-        result = messagebox.askyesno(
-            "全屏时间",
-            "是否开启全屏时间？"
-        )
-        if result:
-            if not hasattr(self, "fullscreen_time_window"):
-                self.fullscreen_time_window = FullscreenTimeWindow(self.root, self.config_handler)
-            self.fullscreen_time_window.show()
+        # 点击计数器
+        if not hasattr(self, '_click_count'):
+            self._click_count = 0
+        self._click_count += 1
+        
+        # 重置计数器定时器
+        if hasattr(self, '_click_timer'):
+            self.root.after_cancel(self._click_timer)
+        self._click_timer = self.root.after(500, self._reset_click_count)
+        
+        # 处理点击逻辑
+        if self._click_count == 1:
+            # 单次点击显示迷你天气
+            # 检查API密钥是否存在
+            if self.config_handler.heweather_api_key:
+                if not hasattr(self, "mini_weather"):
+                    from tools.weather_ui import MiniWeatherUI
+                    main_geometry = self.root.geometry()
+                    self.mini_weather = MiniWeatherUI(
+                        WeatherAPI(), 
+                        master=self.root
+                    )
+        elif self._click_count >= 3:
+            # 三次点击显示全屏时间
+            self._click_count = 0
+            if messagebox.askyesno("确认", "是否打开全屏大号时间？"):
+                if not hasattr(self, "fullscreen_time_window"):
+                    from tools.fullscreen_time import FullscreenTimeWindow
+                    self.fullscreen_time_window = FullscreenTimeWindow(self.root, self.config_handler)
+                self.fullscreen_time_window.show()
+
+    def _reset_click_count(self):
+        """重置点击计数器"""
+        self._click_count = 0
+        
+    def _show_click_tooltip(self, event):
+        """显示点击提示气泡"""
+        # 创建气泡窗口
+        tooltip = tk.Toplevel(self.root)
+        tooltip.wm_overrideredirect(True)
+        tooltip.geometry(f"+{event.x_root+20}+{event.y_root+20}")
+        
+        # 气泡内容
+        label = tk.Label(tooltip, text="待开发功能", bg="yellow", fg="black", padx=8, pady=4)
+        label.pack()
+        
+        # 自动关闭定时器
+        tooltip.after(1500, tooltip.destroy)
 
     def _create_countdown_display(self) -> None:
         """创建倒计时显示区域"""
@@ -263,6 +319,14 @@ class CourseScheduler:
             self._update_countdown_display(now)
             self._update_schedule_display(now)
             self._schedule_next_update()
+            
+            # 检测窗口状态变化
+            is_iconic = self.root.state() == 'iconic'
+            if self.was_iconic and not is_iconic:
+                # 窗口从最小化恢复时重新置顶
+                self.root.attributes('-topmost', True)
+                self.root.after(100, lambda: self.root.attributes('-topmost', False))
+            self.was_iconic = is_iconic
         except Exception as e:
             logger.log_error(e)
 
@@ -277,7 +341,11 @@ class CourseScheduler:
     def _update_countdown_display(self, now: datetime) -> None:
         """更新倒计时显示"""
         delta = (self.config_handler.countdown_date.date() - now.date()).days
-        self.countdown_label2.config(text=str(delta))
+        # 高考彩蛋：当倒计时名称是高考且天数<=100时显示红色
+        if self.config_handler.countdown_name == "高考" and delta <= 100:
+            self.countdown_label2.config(text=str(delta), fg="red")
+        else:
+            self.countdown_label2.config(text=str(delta), fg=self.config_handler.font_color)
 
     def _update_schedule_display(self, now: datetime) -> None:
         """更新课程表显示"""
@@ -321,7 +389,7 @@ class CourseScheduler:
             return "yellow"  # 正在上的课程为黄色
         elif current_time > end_time:
             return "green"   # 已上完的课程为绿色
-        return "#ffcccc"     # 未上过的课程为浅红色
+        return "red"     # 未上过的课程为红色
 
     def _update_existing_label(self, index: int, course: Dict[str, str], color: str) -> None:
         """更新现有课程标签"""

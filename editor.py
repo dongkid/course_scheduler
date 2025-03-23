@@ -300,6 +300,10 @@ class EditorWindow:
             
             # 直接加载UI
             self.create_day_ui(day_frame, str(i))
+            
+        # 默认打开当天标签页
+        current_weekday = datetime.now().weekday()
+        self.notebook.select(current_weekday)
 
     def _create_save_button(self) -> None:
         """创建保存按钮"""

@@ -32,6 +32,11 @@ class SettingsWindow:
         self.style.configure("TFrame", background="white")
         self.style.configure("TLabel", background="white", 
                            font=("微软雅黑", 14))
+        # 新增小按钮样式
+        self.style.configure("PMSmall.TButton", 
+                           font=("微软雅黑", 10),
+                           padding=0,
+                           width=3)
         self.style.configure("TLabelframe", background="white")
         self.style.configure("TLabelframe.Label", background="white")
         self.style.configure("TNotebook", background="white")
@@ -104,51 +109,81 @@ class SettingsWindow:
             text="应用",
             command=self.apply_settings,
             style="TButton"
-        ).pack(side=tk.TOP, pady=10)
+        ).pack(side=tk.LEFT, padx=5, pady=10, fill=tk.X, expand=True)
+        
+        ttk.Button(
+            button_frame,
+            text="重启程序",
+            command=self.restart_ui,
+            style="TButton"
+        ).pack(side=tk.LEFT, padx=5, pady=10, fill=tk.X, expand=True)
         
     def _create_layout_tab(self) -> None:
         """创建排版设置标签页"""
         layout_frame = ttk.Frame(self.notebook, style="TFrame")
         self.notebook.add(layout_frame, text="排版设置")
         
-        # 控件大小设置
+        def create_spinbox(frame, entry_var, row):
+            """创建带加减按钮的输入控件"""
+            # 减按钮（-1）
+            ttk.Button(
+                frame, 
+                text="-", 
+                style="PMSmall.TButton",
+            command=lambda: entry_var.set(max(0, int(entry_var.get() or 0) - 1))
+            ).grid(row=row, column=2, padx=(10,0), pady=5, ipadx=2, ipady=1)
+            
+            # 加按钮（+1）
+            ttk.Button(
+                frame,
+                text="+",
+                style="PMSmall.TButton",
+            command=lambda: entry_var.set(int(entry_var.get() or 0) + 1)
+            ).grid(row=row, column=3, padx=(0,10), pady=5, ipadx=2, ipady=1)
+            
+        # ========== 控件大小设置 ==========
         control_size_frame = ttk.LabelFrame(layout_frame, text="控件大小", style="TFrame")
         control_size_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        # 时间显示控件大小
+
+        # 时间显示大小（新增按钮）
+        time_size_var = tk.StringVar(value=self.main_app.config_handler.time_display_size)
         ttk.Label(control_size_frame, text="时间显示大小:").grid(row=0, column=0, padx=5, pady=5)
-        self.time_display_size = ttk.Entry(control_size_frame, width=5)
+        self.time_display_size = ttk.Entry(control_size_frame, width=5, textvariable=time_size_var)
         self.time_display_size.grid(row=0, column=1, padx=5, pady=5)
-        self.time_display_size.insert(0, str(self.main_app.config_handler.time_display_size))
-        
-        # 倒计时控件大小
+        create_spinbox(control_size_frame, time_size_var, 0)
+
+        # 倒计时大小（新增按钮）
+        countdown_size_var = tk.StringVar(value=self.main_app.config_handler.countdown_size)
         ttk.Label(control_size_frame, text="倒计时大小:").grid(row=1, column=0, padx=5, pady=5)
-        self.countdown_size = ttk.Entry(control_size_frame, width=5)
+        self.countdown_size = ttk.Entry(control_size_frame, width=5, textvariable=countdown_size_var)
         self.countdown_size.grid(row=1, column=1, padx=5, pady=5)
-        self.countdown_size.insert(0, str(self.main_app.config_handler.countdown_size))
-        
-        # 课程表控件大小
+        create_spinbox(control_size_frame, countdown_size_var, 1)
+
+        # 课程表大小（新增按钮）
+        schedule_size_var = tk.StringVar(value=self.main_app.config_handler.schedule_size)
         ttk.Label(control_size_frame, text="课程表大小:").grid(row=2, column=0, padx=5, pady=5)
-        self.schedule_size = ttk.Entry(control_size_frame, width=5)
+        self.schedule_size = ttk.Entry(control_size_frame, width=5, textvariable=schedule_size_var)
         self.schedule_size.grid(row=2, column=1, padx=5, pady=5)
-        self.schedule_size.insert(0, str(self.main_app.config_handler.schedule_size))
-        
-        # 间距设置
+        create_spinbox(control_size_frame, schedule_size_var, 2)
+
+        # ========== 间距设置 ==========
         padding_frame = ttk.LabelFrame(layout_frame, text="间距设置", style="TFrame")
         padding_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        # 水平间距设置
-        ttk.Label(padding_frame, text="水平间距:").grid(row=0, column=0, padx=5, pady=5)
-        self.horizontal_padding = ttk.Entry(padding_frame, width=5)
-        self.horizontal_padding.grid(row=0, column=1, padx=5, pady=5)
-        self.horizontal_padding.insert(0, str(self.main_app.config_handler.horizontal_padding))
-        
-        # 垂直间距设置
-        ttk.Label(padding_frame, text="垂直间距:").grid(row=1, column=0, padx=5, pady=5)
-        self.vertical_padding = ttk.Entry(padding_frame, width=5)
-        self.vertical_padding.grid(row=1, column=1, padx=5, pady=5)
-        self.vertical_padding.insert(0, str(self.main_app.config_handler.vertical_padding))
 
+        # 水平间距（新增按钮）
+        horizontal_var = tk.StringVar(value=self.main_app.config_handler.horizontal_padding)
+        ttk.Label(padding_frame, text="水平间距:").grid(row=0, column=0, padx=5, pady=5)
+        self.horizontal_padding = ttk.Entry(padding_frame, width=5, textvariable=horizontal_var)
+        self.horizontal_padding.grid(row=0, column=1, padx=5, pady=5)
+        create_spinbox(padding_frame, horizontal_var, 0)
+
+        # 垂直间距（新增按钮）
+        vertical_var = tk.StringVar(value=self.main_app.config_handler.vertical_padding)
+        ttk.Label(padding_frame, text="垂直间距:").grid(row=1, column=0, padx=5, pady=5)
+        self.vertical_padding = ttk.Entry(padding_frame, width=5, textvariable=vertical_var)
+        self.vertical_padding.grid(row=1, column=1, padx=5, pady=5)
+        create_spinbox(padding_frame, vertical_var, 1)
+    
     def _create_window_tab(self) -> None:
         """创建窗口控制标签页"""
         window_frame = ttk.Frame(self.notebook, style="TFrame")
@@ -189,15 +224,45 @@ class SettingsWindow:
         size_frame = ttk.LabelFrame(window_frame, text="窗口大小", style="TFrame")
         size_frame.pack(fill=tk.X, padx=10, pady=5)
         
+        # 宽度设置带加减按钮
+        width_var = tk.StringVar(value=self.main_app.root.winfo_width())
         ttk.Label(size_frame, text="宽度:").grid(row=0, column=0, padx=5, pady=5)
-        self.width_entry = ttk.Entry(size_frame, width=5)
+        self.width_entry = ttk.Entry(size_frame, width=5, textvariable=width_var)
         self.width_entry.grid(row=0, column=1, padx=5, pady=5)
-        self.width_entry.insert(0, self.main_app.root.winfo_width())
         
+        # 宽度加减按钮
+        ttk.Button(
+            size_frame, 
+            text="-", 
+            style="PMSmall.TButton",
+            command=lambda: width_var.set(max(100, int(width_var.get() or 100) - 10))
+        ).grid(row=0, column=2, padx=(10,0), pady=5)
+        ttk.Button(
+            size_frame,
+            text="+",
+            style="PMSmall.TButton",
+            command=lambda: width_var.set(int(width_var.get() or 100) + 10)
+        ).grid(row=0, column=3, padx=(0,10), pady=5)
+
+        # 高度设置带加减按钮
+        height_var = tk.StringVar(value=self.main_app.root.winfo_height())
         ttk.Label(size_frame, text="高度:").grid(row=1, column=0, padx=5, pady=5)
-        self.height_entry = ttk.Entry(size_frame, width=5)
+        self.height_entry = ttk.Entry(size_frame, width=5, textvariable=height_var)
         self.height_entry.grid(row=1, column=1, padx=5, pady=5)
-        self.height_entry.insert(0, self.main_app.root.winfo_height())
+        
+        # 高度加减按钮
+        ttk.Button(
+            size_frame, 
+            text="-", 
+            style="PMSmall.TButton",
+            command=lambda: height_var.set(max(100, int(height_var.get() or 100) - 10))
+        ).grid(row=1, column=2, padx=(10,0), pady=5)
+        ttk.Button(
+            size_frame,
+            text="+",
+            style="PMSmall.TButton",
+            command=lambda: height_var.set(int(height_var.get() or 100) + 10)
+        ).grid(row=1, column=3, padx=(0,10), pady=5)
 
     def _create_course_tab(self) -> None:
         """创建课程设置标签页"""
@@ -387,15 +452,17 @@ class SettingsWindow:
         self.debug_check.pack(side=tk.LEFT, padx=5)
 
 
-    def restart_ui(self) -> None:
-        """重启主界面"""
-        # 销毁现有界面组件
-        for widget in self.main_app.root.winfo_children():
-            widget.destroy()
-        
-        # 重新初始化界面
-        self.main_app._initialize_ui()
-        messagebox.showinfo("成功", "主界面已重启")
+    def destroy_children(self, widget):
+        """递归销毁所有子组件"""
+        for child in widget.winfo_children():
+            if child.winfo_children():
+                self.destroy_children(child)
+            child.destroy()
+
+    def restart_ui(self, open_settings=False) -> None:
+        """触发进程级完全重启"""
+        from restart_manager import RestartManager
+        RestartManager.restart_application(self.main_app, open_settings=open_settings)
 
     def _show_about(self) -> None:
         """显示关于对话框"""
@@ -433,13 +500,23 @@ class SettingsWindow:
         if self.applying:  # 如果正在处理，直接返回
             return
         self.applying = True  # 设置标志位为处理中
+        
+        # 保存旧值用于比较
+        old_layout = {
+            'horizontal_padding': self.main_app.config_handler.horizontal_padding,
+            'vertical_padding': self.main_app.config_handler.vertical_padding,
+            'time_display_size': self.main_app.config_handler.time_display_size,
+            'countdown_size': self.main_app.config_handler.countdown_size,
+            'schedule_size': self.main_app.config_handler.schedule_size,
+            'font_size': self.main_app.config_handler.font_size,
+            'font_color': self.main_app.config_handler.font_color
+        }
+        
         try:
             # 应用排版设置
             try:
-                horizontal_padding = int(self.horizontal_padding.get())
-                vertical_padding = int(self.vertical_padding.get())
-                if horizontal_padding < 0 or vertical_padding < 0:
-                    raise ValueError
+                horizontal_padding = max(0, int(self.horizontal_padding.get() or 0))
+                vertical_padding = max(0, int(self.vertical_padding.get() or 0))
                 self.main_app.config_handler.horizontal_padding = horizontal_padding
                 self.main_app.config_handler.vertical_padding = vertical_padding
             except ValueError:
@@ -454,9 +531,11 @@ class SettingsWindow:
                     raise ValueError
                 x = self.main_app.root.winfo_x()
                 y = self.main_app.root.winfo_y()
-                self.main_app.root.geometry(f"{width}x{height}+{x}+{y}")
+                # 构建新的geometry并保存到配置
+                new_geometry = f"{width}x{height}+{x}+{y}"
+                self.main_app.root.geometry(new_geometry)
+                self.main_app.config_handler.geometry = new_geometry
                 self.main_app.root.update()
-                self.main_app._adjust_ui_layout()
                 self.main_app.root.update_idletasks()
                 # 更新输入框中的值
                 self.width_entry.delete(0, tk.END)
@@ -525,11 +604,11 @@ class SettingsWindow:
             
             # 应用控件大小设置
             try:
-                self.main_app.config_handler.time_display_size = int(self.time_display_size.get())
-                self.main_app.config_handler.countdown_size = int(self.countdown_size.get())
-                self.main_app.config_handler.schedule_size = int(self.schedule_size.get())
+                self.main_app.config_handler.time_display_size = max(0, int(self.time_display_size.get() or 0))
+                self.main_app.config_handler.countdown_size = max(0, int(self.countdown_size.get() or 0))
+                self.main_app.config_handler.schedule_size = max(0, int(self.schedule_size.get() or 0))
             except ValueError:
-                messagebox.showerror("错误", "请输入有效的控件大小值")
+                messagebox.showerror("错误", "请输入有效的正整数")
                 return
             
             # 应用透明背景设置
@@ -553,7 +632,23 @@ class SettingsWindow:
             self.main_app.config_handler.save_config()
             # 更新字体设置
             self.main_app._update_font_settings()
-            messagebox.showinfo("成功", "设置已保存")
+            
+            # 检查排版设置是否修改
+            new_layout = {
+                'horizontal_padding': self.main_app.config_handler.horizontal_padding,
+                'vertical_padding': self.main_app.config_handler.vertical_padding,
+                'time_display_size': self.main_app.config_handler.time_display_size,
+                'countdown_size': self.main_app.config_handler.countdown_size,
+                'schedule_size': self.main_app.config_handler.schedule_size,
+                'font_size': self.main_app.config_handler.font_size,
+                'font_color': self.main_app.config_handler.font_color
+            }
+            
+            if new_layout != old_layout:
+                if messagebox.askyesno("提示", "部分排版设置需要重启程序才能生效，是否立即重启？"):
+                    self.restart_ui(open_settings=True)
+            else:
+                messagebox.showinfo("成功", "设置已保存")
         except Exception as e:
             logger.log_error(e)
             messagebox.showerror("错误", "保存设置时发生错误")

@@ -1,5 +1,7 @@
 import requests
 import tkinter as tk
+import threading
+import time
 from tkinter import ttk, messagebox
 from tkinter.simpledialog import Dialog
 from config_handler import ConfigHandler
@@ -229,6 +231,7 @@ class WeatherTool:
         self.name = "天气"
         self.api = WeatherAPI()
         self.ui = None
+        self.mini_ui = None
         
     def show(self):
         """显示天气界面"""
@@ -239,3 +242,12 @@ class WeatherTool:
         if not self.ui:
             self.ui = WeatherUI(self.api)
         self.ui.deiconify()
+
+    def get_mini_ui(self, master=None):
+        """获取迷你天气界面组件"""
+        if not self.mini_ui:
+            from tools.weather_ui import MiniWeatherUI
+            self.mini_ui = MiniWeatherUI(self.api, master=master)
+            # 初始加载数据
+            Thread(target=self.mini_ui.refresh_weather).start()
+        return self.mini_ui
