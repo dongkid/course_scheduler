@@ -16,6 +16,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='课程表程序')
     parser.add_argument('--open-settings', action='store_true',
                        help='启动时打开设置窗口')
+    parser.add_argument('--open-menu', action='store_true',
+                       help='启动时打开主菜单')
     args = parser.parse_args()
 
     # 单实例检查
@@ -29,7 +31,12 @@ if __name__ == "__main__":
     #初始化文件
     check_and_generate_files()
     
-    app = CourseScheduler(startup_action=args.open_settings and 'open_settings' or None)
+    startup_action = None
+    if args.open_settings:
+        startup_action = 'open_settings'
+    elif args.open_menu:
+        startup_action = 'open_menu'
+    app = CourseScheduler(startup_action=startup_action)
     # 清理可能存在的临时重启资源
     RestartManager.cleanup_restart_manager_resources()
     try:

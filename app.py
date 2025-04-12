@@ -49,6 +49,8 @@ class CourseScheduler:
             # 执行启动动作
             if self.startup_action == 'open_settings':
                 self.open_settings()
+            elif self.startup_action == 'open_menu' and self.main_menu:
+                self.main_menu.show()
         except Exception as e:
             logger.log_error(e)
             raise
@@ -211,7 +213,7 @@ class CourseScheduler:
         from tkinter import messagebox
         from tools.fullscreen_time import FullscreenTimeWindow
         from tools.weather_ui import WeatherUI
-        from tools.weather import WeatherAPI
+        from tools.weather import WeatherAPI, WeatherTool
         
         # 点击计数器
         if not hasattr(self, '_click_count'):
@@ -228,13 +230,11 @@ class CourseScheduler:
             # 单次点击显示迷你天气
             # 检查API密钥是否存在
             if self.config_handler.heweather_api_key:
-                if not hasattr(self, "mini_weather"):
-                    from tools.weather_ui import MiniWeatherUI
-                    main_geometry = self.root.geometry()
-                    self.mini_weather = MiniWeatherUI(
-                        WeatherAPI(), 
-                        master=self.root
-                    )
+                # 使用WeatherTool来获取或创建迷你天气界面
+                if not hasattr(self, "weather_tool"):
+                    self.weather_tool = WeatherTool()
+                # 获取迷你天气界面（如果已存在会重用）
+                self.weather_tool.get_mini_ui(master=self.root)
         elif self._click_count >= 3:
             # 三次点击显示全屏时间
             self._click_count = 0

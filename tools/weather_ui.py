@@ -10,7 +10,6 @@ from PIL import Image, ImageTk
 
 class MiniWeatherUI(tk.Toplevel):
     """迷你天气信息展示组件"""
-    """目前存在bug，15s后销毁窗口无法再次打开"""
     def __init__(self, api, master=None):
         super().__init__(master)
         self.overrideredirect(True)  # 无边框窗口
@@ -34,17 +33,26 @@ class MiniWeatherUI(tk.Toplevel):
             self._master_configure_id = master.bind('<Configure>', self._update_position)
 
     def _safe_destroy(self):
-        """安全销毁窗口并清理资源"""
-        # 取消所有待处理的回调
-        for cb in self._pending_callbacks:
-            self.after_cancel(cb)
-        
-        # 解绑主窗口事件
-        if hasattr(self, '_master_configure_id') and self.master:
-            self.master.unbind('<Configure>', self._master_configure_id)
-        
-        # 销毁窗口
-        self.destroy()
+        """安全隐藏窗口并清理资源"""
+        try:
+            # 取消所有待处理的回调
+            for cb in self._pending_callbacks:
+                self.after_cancel(cb)
+            
+            # 停止所有线程和后台任务
+            if hasattr(self, '_auto_refresh_thread'):
+                self._auto_refresh_thread.join(timeout=1)
+            
+            # 隐藏窗口
+            self.withdraw()
+        except tk.TclError as e:
+            if "can't invoke \"destroy\" command" not in str(e):
+                logger.log_error(f"窗口操作时出错: {str(e)}")
+        finally:
+            # 确保所有资源释放
+            self._pending_callbacks.clear()
+            if hasattr(self, 'weather_icon'):
+                self.weather_icon = None
 
     def _initialize_position(self):
         """初始化窗口位置（带重试机制）"""
@@ -74,7 +82,7 @@ class MiniWeatherUI(tk.Toplevel):
             # 检查主窗口是否仍然存在
             if not self.master or not self.master.winfo_exists():
                 logger.log_warning("主窗口已销毁，使用默认位置")
-                self.geometry("300x100+10+10")
+                self.geometry("440x120+10+10")
                 return
 
             main_win_x = self.master.winfo_x()
@@ -85,7 +93,7 @@ class MiniWeatherUI(tk.Toplevel):
             logger.log_debug(f"主窗口位置: X={main_win_x}, Y={main_win_y}, 尺寸: {main_win_width}x{main_win_height}")
             
             # 设置迷你窗口尺寸
-            width, height = 300, 100
+            width, height = 440, 120
             
             # 计算位置：主窗口左侧垂直居中
             x = main_win_x - width - 10  # 左侧留10像素间隙
@@ -118,7 +126,7 @@ class MiniWeatherUI(tk.Toplevel):
             
         except Exception as e:
             logger.log_error(f"位置计算异常: {str(e)}")
-            self.geometry("300x100+10+10")  # 回退到默认位置
+            self.geometry("440x120+10+10")  # 回退到默认位置
 
     def _update_position(self, event=None):
         """当主窗口移动时更新位置（带防抖机制）"""
@@ -157,48 +165,137 @@ class MiniWeatherUI(tk.Toplevel):
 
     def _create_widgets(self):
         # 设置组件最小宽度和高度
-        self.geometry("440x80+10+10")  # 设置固定尺寸和初始位置
+        self.geometry("440x120+10+10")  # 设置固定尺寸和初始位置
+        
+        # 创建标题行
+        title_frame = tk.Frame(self, bg='white')
+        title_frame.grid(row=0, column=0, columnspan=3, sticky='ew', padx=5, pady=(5,0))
         
         # 天气图标
-        self.icon_label = ttk.Label(self, image=self.weather_icon)
-        self.icon_label.grid(row=0, column=0, padx=5, sticky='w')
-
-        # 温度显示
-        self.temp_label = ttk.Label(
-            self, 
-            font=('微软雅黑', 12, 'bold'),
-            style='White.TLabel',
-            anchor='center',
-            text="--°"
-        )
-        self.temp_label.grid(row=0, column=1, padx=5, sticky='ew')
-
-        # 天气状态和更新时间容器
-        info_frame = ttk.Frame(self, style='White.TFrame', padding=(0, 2))
-        info_frame.grid(row=0, column=2, padx=5, sticky='e')
+        self.icon_label = tk.Label(title_frame, image=self.weather_icon, bg='white')
+        self.icon_label.pack(side='left', padx=(0,10))
         
-        self.status_label = ttk.Label(
-            info_frame,
-            font=('微软雅黑', 9),
-            style='White.TLabel',
-            anchor='e',
-            text="加载中..."
-        )
-        self.status_label.pack(side='top', fill='x')
-        
-        self.update_label = ttk.Label(
-            info_frame,
+        # 城市名称标签
+        self.city_label = tk.Label(
+            title_frame,
             font=('微软雅黑', 8),
-            style='White.TLabel',
+            foreground='#666666',
+            anchor='w',
+            text="城市: --",
+            bg='white'
+        )
+        self.city_label.pack(side='left', padx=(0,10))
+        
+        # 标题和更新时间
+        title_label = tk.Label(
+            title_frame,
+            text="天气预报",
+            font=('微软雅黑', 10, 'bold'),
+            bg='white'
+        )
+        title_label.pack(side='left', fill='x', expand=True)
+        
+        # 更新时间标签
+        self.update_label = tk.Label(
+            title_frame,
+            font=('微软雅黑', 8),
             foreground='#666666',
             anchor='e',
-            text="🕒 --:--"
+            text="🕒 --:--",
+            bg='white'
         )
-        self.update_label.pack(side='top', fill='x')
-
+        self.update_label.pack(side='right', padx=(0, 50))
+        
+        # 关闭按钮
+        self.close_btn = tk.Label(
+            self,
+            text="×",
+            font=('微软雅黑', 12, 'bold'),
+            foreground='#999999',
+            bg='white',
+            cursor='hand2'
+        )
+        self.close_btn.place(relx=1.0, x=-25, y=5, anchor='ne')
+        self.close_btn.bind('<Button-1>', lambda e: self._safe_destroy())
+        
+        # 创建分隔线（使用Frame代替Separator）
+        separator = tk.Frame(self, height=1, bg='#cccccc')
+        separator.grid(row=1, column=0, columnspan=3, sticky='ew', padx=5, pady=3)
+        
+        # 今天天气区域
+        today_frame = tk.Frame(self, bg='white')
+        today_frame.grid(row=2, column=0, columnspan=3, sticky='ew', padx=5)
+        
+        # 今天标签
+        today_label = tk.Label(
+            today_frame,
+            text="今天",
+            font=('微软雅黑', 9, 'bold'),
+            bg='white'
+        )
+        today_label.grid(row=0, column=0, sticky='w')
+        
+        # 今天温度显示
+        self.temp_label = tk.Label(
+            today_frame, 
+            font=('微软雅黑', 12, 'bold'),
+            anchor='center',
+            text="--°",
+            bg='white'
+        )
+        self.temp_label.grid(row=0, column=1, padx=10, sticky='ew')
+        
+        # 今天天气状态
+        self.status_label = tk.Label(
+            today_frame,
+            font=('微软雅黑', 9),
+            anchor='e',
+            text="加载中...",
+            bg='white'
+        )
+        self.status_label.grid(row=0, column=2, sticky='e')
+        
+        # 明天天气区域
+        tomorrow_frame = tk.Frame(self, bg='white')
+        tomorrow_frame.grid(row=3, column=0, columnspan=3, sticky='ew', padx=5, pady=(5,5))
+        
+        # 明天标签
+        tomorrow_label = tk.Label(
+            tomorrow_frame,
+            text="明天",
+            font=('微软雅黑', 9, 'bold'),
+            bg='white'
+        )
+        tomorrow_label.grid(row=0, column=0, sticky='w')
+        
+        # 明天温度显示
+        self.tomorrow_temp_label = tk.Label(
+            tomorrow_frame, 
+            font=('微软雅黑', 12, 'bold'),
+            anchor='center',
+            text="--°",
+            bg='white'
+        )
+        self.tomorrow_temp_label.grid(row=0, column=1, padx=10, sticky='ew')
+        
+        # 明天天气状态
+        self.tomorrow_status_label = tk.Label(
+            tomorrow_frame,
+            font=('微软雅黑', 9),
+            anchor='e',
+            text="加载中...",
+            bg='white'
+        )
+        self.tomorrow_status_label.grid(row=0, column=2, sticky='e')
+        
         # 列配置
+        self.columnconfigure(0, weight=0)
         self.columnconfigure(1, weight=1)
-        self.columnconfigure(2, minsize=120)  # 设置信息列最小宽度
+        self.columnconfigure(2, weight=0)
+        
+        # 行配置
+        today_frame.columnconfigure(1, weight=1)
+        tomorrow_frame.columnconfigure(1, weight=1)
 
     def _start_auto_refresh(self):
         def refresh_loop():
@@ -213,26 +310,49 @@ class MiniWeatherUI(tk.Toplevel):
         location_id = self.api.get_location_id(location)
         if location_id:
             data = self.api.get_3d_weather(location_id)
-            if data:
-                self.current_data = data[0]
+            if data and len(data) >= 2:
+                self.current_data = data[0]  # 今天
+                self.tomorrow_data = data[1]  # 明天
+                if hasattr(self, 'city_label'):
+                    self.city_label.config(text=f"城市: {location}")
                 self._update_display()
 
     def _update_display(self):
-        # 更新温度（更醒目的显示方式）
+        # 更新今天温度
         temp_text = f"{self.current_data.get('tempMax', '--')}° / {self.current_data.get('tempMin', '--')}°"
         self.temp_label.config(text=temp_text)
         
-        # 更新天气状态（简写显示）
+        # 更新今天天气状态
         day_status = self.current_data.get('textDay', '').replace("转", "/")
         night_status = self.current_data.get('textNight', '').replace("转", "/")
         status = f"☀ {day_status} | ☾ {night_status}"
         self.status_label.config(text=status)
         
-        # 更新时间显示（更紧凑的格式）
+        # 更新明天温度
+        if hasattr(self, 'tomorrow_data'):
+            tomorrow_temp = f"{self.tomorrow_data.get('tempMax', '--')}° / {self.tomorrow_data.get('tempMin', '--')}°"
+            self.tomorrow_temp_label.config(text=tomorrow_temp)
+            
+            # 更新明天天气状态
+            tomorrow_day = self.tomorrow_data.get('textDay', '').replace("转", "/")
+            tomorrow_night = self.tomorrow_data.get('textNight', '').replace("转", "/")
+            tomorrow_status = f"☀ {tomorrow_day} | ☾ {tomorrow_night}"
+            self.tomorrow_status_label.config(text=tomorrow_status)
+            
+            # 根据明天温度调整颜色
+            tomorrow_max = int(self.tomorrow_data.get('tempMax', 0))
+            if tomorrow_max >= 30:
+                self.tomorrow_temp_label.config(foreground='#e74c3c')  # 高温红色
+            elif tomorrow_max <= 10:
+                self.tomorrow_temp_label.config(foreground='#3498db')  # 低温蓝色
+            else:
+                self.tomorrow_temp_label.config(foreground='#2ecc71')  # 舒适绿色
+        
+        # 更新时间显示
         now = datetime.datetime.now().strftime("%H:%M")
         self.update_label.config(text=f"🕒 {now}")
         
-        # 根据温度调整颜色
+        # 根据今天温度调整颜色
         temp_max = int(self.current_data.get('tempMax', 0))
         if temp_max >= 30:
             self.temp_label.config(foreground='#e74c3c')  # 高温红色
@@ -247,10 +367,6 @@ class WeatherUI(tk.Toplevel):
         self.api = api
         self.current_location = "北京"
         self.configure(background='white')  # 设置主窗口背景
-        # 创建白色背景样式
-        style = ttk.Style()
-        style.configure('White.TFrame', background='white')
-        style.configure('White.TLabel', background='white')
         self.init_ui()
         self.load_default_location()
 
@@ -258,63 +374,40 @@ class WeatherUI(tk.Toplevel):
         self.title("天气预报")
         self.minsize(600, 500)  # 调整窗口最小尺寸以适应更多内容
         
-        main_frame = ttk.Frame(self)
+        main_frame = tk.Frame(self, bg='white')
         main_frame.pack(fill='both', expand=True, padx=10, pady=10)
 
         # 地区选择
-        location_frame = ttk.Frame(main_frame)
+        location_frame = tk.Frame(main_frame, bg='white')
         location_frame.pack(fill='x', pady=5)
         
         self.location_combo = ttk.Combobox(location_frame)
         self.location_combo.pack(side='left', fill='x', expand=True, padx=(0,5))
         
-        self.search_btn = ttk.Button(location_frame, text="查询", command=self.search_weather)
+        self.search_btn = tk.Button(location_frame, text="查询", command=self.search_weather, bg='#f0f0f0')
         self.search_btn.pack(side='left')
 
         # 天气信息展示
-        self.weather_info = ttk.Frame(main_frame)
+        self.weather_info = tk.Frame(main_frame, bg='white')
         self.weather_info.pack(fill='both', expand=True)
         
-        # 初始化三天天气表格（使用ttk.Treeview）
+        # 初始化三天天气表格（使用ttk.Treeview - 保留，因为tk没有等效组件）
         self.weather_tables = {
             0: ttk.Treeview(self.weather_info, height=8, columns=('value'), show='tree'),
             1: ttk.Treeview(self.weather_info, height=8, columns=('value'), show='tree'),
             2: ttk.Treeview(self.weather_info, height=8, columns=('value'), show='tree')
         }
-        
-        # 配置表格样式
-        style = ttk.Style()
-        style.configure('Weather.Treeview', 
-                       rowheight=25, 
-                       font=('Arial', 9),
-                       background='white',
-                       borderwidth=1,
-                       relief='solid',
-                       bordercolor='white')
-        style.configure('Weather.Treeview.Heading', 
-                       font=('Arial', 9, 'bold'),
-                       background='white',
-                       borderwidth=0)
-        style.layout('Weather.Treeview', [
-            ('Treeview.border', {'sticky': 'nswe', 'children': [
-                ('Treeview.treearea', {'sticky': 'nswe'})
-            ]})
-        ])  # 保留边框结构
-        style.map('Weather.Treeview',
-                bordercolor=[('!focus', 'white')],
-                lightcolor=[('!focus', 'white')],
-                darkcolor=[('!focus', 'white')])
 
         # 调整网格布局
         self.weather_info.columnconfigure(1, weight=1)
         
         # 表头
-        ttk.Label(self.weather_info, text="日期", font=('Arial', 9, 'bold')).grid(row=0, column=0, padx=5, pady=2)
-        ttk.Label(self.weather_info, text="天气详情", font=('Arial', 9, 'bold')).grid(row=0, column=1, padx=5, pady=2)
+        tk.Label(self.weather_info, text="日期", font=('Arial', 9, 'bold'), bg='white').grid(row=0, column=0, padx=5, pady=2)
+        tk.Label(self.weather_info, text="天气详情", font=('Arial', 9, 'bold'), bg='white').grid(row=0, column=1, padx=5, pady=2)
         
         # 配置三天天气行
         for i in range(0, 3):
-            ttk.Label(self.weather_info, text=["今天", "明天", "后天"][i]+"：").grid(row=i+1, column=0, sticky='ne', padx=5, pady=2)
+            tk.Label(self.weather_info, text=["今天", "明天", "后天"][i]+"：", bg='white').grid(row=i+1, column=0, sticky='ne', padx=5, pady=2)
             
             # 表格布局和配置
             self.weather_tables[i].grid(row=i+1, column=1, sticky='nsew', padx=5, pady=2)

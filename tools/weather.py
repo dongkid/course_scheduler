@@ -245,9 +245,27 @@ class WeatherTool:
 
     def get_mini_ui(self, master=None):
         """获取迷你天气界面组件"""
-        if not self.mini_ui:
-            from tools.weather_ui import MiniWeatherUI
-            self.mini_ui = MiniWeatherUI(self.api, master=master)
-            # 初始加载数据
-            Thread(target=self.mini_ui.refresh_weather).start()
+        # 销毁现有实例（如果存在）
+        if self.mini_ui:
+            try:
+                self.mini_ui._safe_destroy()
+            except Exception as e:
+                logger.log_error(f"销毁迷你窗口时出错: {str(e)}")
+            finally:
+                self.mini_ui = None
+        
+        from tools.weather_ui import MiniWeatherUI
+        self.mini_ui = MiniWeatherUI(self.api, master=master)
+        # 添加窗口关闭回调
+        self.mini_ui.protocol("WM_DELETE_WINDOW", self._on_mini_ui_close)
+        # 初始加载数据
+        Thread(target=self.mini_ui.refresh_weather).start()
         return self.mini_ui
+
+    def _on_mini_ui_close(self):
+        """处理迷你窗口关闭事件"""
+        if self.mini_ui:
+            try:
+                self.mini_ui._safe_destroy()
+            finally:
+                self.mini_ui = None
