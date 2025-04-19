@@ -170,52 +170,81 @@ class MiniWeatherUI(tk.Toplevel):
         # 创建标题行
         title_frame = tk.Frame(self, bg='white')
         title_frame.grid(row=0, column=0, columnspan=3, sticky='ew', padx=5, pady=(5,0))
+        title_frame.grid_columnconfigure(0, weight=0)
+        title_frame.grid_columnconfigure(1, weight=1)  # 中间列自适应
+        title_frame.grid_columnconfigure(2, weight=0)
         
+        # 左侧组件框架（固定宽度）
+        left_frame = tk.Frame(title_frame, bg='white')
+        left_frame.grid(row=0, column=0, sticky='w')
         # 天气图标
-        self.icon_label = tk.Label(title_frame, image=self.weather_icon, bg='white')
-        self.icon_label.pack(side='left', padx=(0,10))
+        self.icon_label = tk.Label(left_frame, image=self.weather_icon, bg='white')
+        self.icon_label.grid(row=0, column=0, padx=(0,5))
         
         # 城市名称标签
         self.city_label = tk.Label(
-            title_frame,
+            left_frame,
             font=('微软雅黑', 8),
             foreground='#666666',
             anchor='w',
             text="城市: --",
             bg='white'
         )
-        self.city_label.pack(side='left', padx=(0,10))
+        self.city_label.grid(row=0, column=1, padx=(0,5))
         
-        # 标题和更新时间
+        # 手动刷新按钮
+        self.refresh_btn = tk.Label(
+            left_frame,
+            text="🔄",
+            font=('微软雅黑', 8),
+            foreground='#666666',
+            bg='white',
+            cursor='hand2'
+        )
+        self.refresh_btn.grid(row=0, column=2, padx=(0,5))
+        self.refresh_btn.bind('<Button-1>', lambda e: Thread(target=self.refresh_weather).start())
+        self.refresh_btn.bind('<Enter>', lambda e: self.refresh_btn.config(foreground='#2ecc71'))
+        self.refresh_btn.bind('<Leave>', lambda e: self.refresh_btn.config(foreground='#666666'))
+
+        # 中间标题
         title_label = tk.Label(
             title_frame,
             text="天气预报",
             font=('微软雅黑', 10, 'bold'),
             bg='white'
         )
-        title_label.pack(side='left', fill='x', expand=True)
+        title_label.grid(row=0, column=1, sticky='ew')
+
+        # 右侧组件框架
+        right_frame = tk.Frame(title_frame, bg='white')
+        right_frame.grid(row=0, column=2, sticky='e')
         
         # 更新时间标签
         self.update_label = tk.Label(
-            title_frame,
+            right_frame,
             font=('微软雅黑', 8),
             foreground='#666666',
             anchor='e',
             text="🕒 --:--",
             bg='white'
         )
-        self.update_label.pack(side='right', padx=(0, 50))
+        # 更新时间标签
+        self.update_label.grid(row=0, column=0, padx=(0, 10))
         
         # 关闭按钮
         self.close_btn = tk.Label(
-            self,
+            right_frame,
             text="×",
             font=('微软雅黑', 12, 'bold'),
             foreground='#999999',
             bg='white',
             cursor='hand2'
         )
-        self.close_btn.place(relx=1.0, x=-25, y=5, anchor='ne')
+        self.close_btn.grid(row=0, column=1, padx=(0, 5))
+        
+        # 配置右侧框架列权重
+        right_frame.columnconfigure(0, weight=1)
+        right_frame.columnconfigure(1, weight=0)
         self.close_btn.bind('<Button-1>', lambda e: self._safe_destroy())
         
         # 创建分隔线（使用Frame代替Separator）
