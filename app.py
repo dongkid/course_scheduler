@@ -12,7 +12,10 @@ from main_menu import MainMenu
 class CourseScheduler:
     """课程表主应用类"""
     def __init__(self, startup_action=None):
-        """初始化课程表应用"""
+        """初始化课程表应用
+        Args:
+            startup_action: 启动时要执行的动作
+        """
         self.startup_action = startup_action
         try:
             logger.log_debug("Initializing CourseScheduler application")
@@ -181,7 +184,7 @@ class CourseScheduler:
                 "关于": self.open_about,
                 # 重启功能存在问题，暂时注释。
                 # "重启程序": self.restart_program,
-                "退出程序": self.root.quit
+                "退出程序": self._exit_with_confirmation
             }
         )
         
@@ -559,6 +562,16 @@ class CourseScheduler:
         else:
             self.about_window.window.lift()
             
+    def _exit_with_confirmation(self):
+        """带确认的退出函数"""
+        # self.root.quit()
+        from tkinter import messagebox
+        if self.config_handler.debug_mode:
+            self.root.quit()
+        else:
+            if messagebox.askyesno("确认", "确定要退出程序吗？"):
+                self.root.quit()
+
     def _show_tools_window(self):
         """显示小工具窗口"""
         from tools_window import ToolsWindow

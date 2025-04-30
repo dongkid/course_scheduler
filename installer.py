@@ -23,9 +23,40 @@ def get_target_dir():
     return os.path.join(os.environ['APPDATA'], 'CourseScheduler')
 
 def is_desktop_path(path):
-    """检查是否在桌面目录"""
-    desktop = os.path.expanduser('~/Desktop')
-    return os.path.normpath(path).lower() == os.path.normpath(desktop).lower()
+    """检查是否在桌面目录(支持系统默认和自定义路径)"""
+    try:
+        import ctypes
+        from ctypes import wintypes
+        
+        # 获取系统默认桌面路径
+        CSIDL_DESKTOP = 0x0000
+        SHGFP_TYPE_CURRENT = 0
+        
+        buf = ctypes.create_unicode_buffer(wintypes.MAX_PATH)
+        ctypes.windll.shell32.SHGetFolderPathW(
+            None, CSIDL_DESKTOP, None, SHGFP_TYPE_CURRENT, buf)
+        system_desktop = buf.value
+        
+        # 常见自定义桌面路径
+        custom_desktops = [
+            os.path.expanduser('~/Desktop'),  # 默认
+            system_desktop,                   # 系统
+            'D:\\Desktop',                    # 常见自定义
+            'E:\\Desktop',
+            'F:\\Desktop'
+        ]
+        
+        # 规范化比较路径
+        norm_path = os.path.normpath(path).lower()
+        return any(
+            os.path.normpath(d).lower() == norm_path
+            for d in custom_desktops
+            if d  # 过滤空路径
+        )
+    except Exception:
+        # 回退方案
+        desktop = os.path.expanduser('~/Desktop')
+        return os.path.normpath(path).lower() == os.path.normpath(desktop).lower()
 
 def create_shortcut(target, shortcut_path):
     """使用VBScript创建快捷方式"""
@@ -75,7 +106,7 @@ def create_shortcut(target, shortcut_path):
         
         # 创建临时VBS文件
         temp_vbs = os.path.join(os.environ['TEMP'], 'create_shortcut.vbs')
-        with open(temp_vbs, 'w', encoding='gbk') as f:
+        with open(temp_vbs, 'w', encoding='utf-8') as f:
             f.write(vbs_script)
             
         # 执行VBS脚本
@@ -236,7 +267,7 @@ start "" /D "%APPDATA%\CourseScheduler" "{target_path}"
 del /f /q "%~f0" >nul 2>&1
 exit
 """
-        with open(bat_path, 'w', encoding='gbk') as f:
+        with open(bat_path, 'w', encoding='utf-8') as f:
             f.write(script_content)
         
         # 创建并执行计划任务

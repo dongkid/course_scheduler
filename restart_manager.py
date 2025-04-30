@@ -74,7 +74,7 @@ echo starting process...
                 cd /d "{exe_dir}" && start "" "{exe_path}" {"--open-settings" if open_settings else ""}
 exit
 """
-                with open(bat_path, 'w', encoding='gbk') as f:
+                with open(bat_path, 'w', encoding='utf-8') as f:
                     f.write(script_content)
                 logger.log_debug(f"生成的批处理脚本内容:\n{script_content}")
 

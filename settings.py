@@ -461,8 +461,13 @@ class SettingsWindow:
 
     def restart_ui(self, open_settings=False) -> None:
         """触发进程级完全重启"""
-        from restart_manager import RestartManager
-        RestartManager.restart_application(self.main_app, open_settings=open_settings)
+        if self.main_app.config_handler.debug_mode:
+            from restart_manager import RestartManager
+            RestartManager.restart_application(self.main_app, open_settings=open_settings)
+        else:
+            if messagebox.askyesno("确认", "确定要重启程序吗？"):
+                from restart_manager import RestartManager
+                RestartManager.restart_application(self.main_app, open_settings=open_settings)
 
     def _show_about(self) -> None:
         """显示关于对话框"""
