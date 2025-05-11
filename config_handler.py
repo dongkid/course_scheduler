@@ -2,7 +2,7 @@ import json
 import os
 import threading
 from datetime import datetime
-from constants import DEFAULT_GEOMETRY, CONFIG_FILE
+from constants import DEFAULT_GEOMETRY, CONFIG_FILE, VERSION
 
 class ConfigHandler:
     def __init__(self):
@@ -165,7 +165,10 @@ class ConfigHandler:
         logger.log_debug(f"开始保存配置，最后天气位置: {self.last_weather_location}")
         
         # 准备配置数据（添加窗口位置和缺失的配置项）
+        # 处理版本号格式：去除点和横杠，只保留数字
+        cleaned_version = ''.join(c for c in VERSION if c.isdigit())
         config_data = {
+            "config_version": cleaned_version,  # 使用特殊字段名并存储处理后的版本号
             "geometry": self.geometry if self.geometry else DEFAULT_GEOMETRY,
             "countdown_name": self.countdown_name,
             "countdown_date": self.countdown_date.strftime("%Y-%m-%d"),
