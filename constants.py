@@ -9,4 +9,5 @@ WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"]
 APP_NAME = "桌面课程表 - Course Scheduler"
 AUTHOR = "dong"
 VERSION = "0.1.15-preview"
+CONFIG_VERSION = "1"
 PROJECT_URL = "https://github.com/dongkid/course_scheduler"
