@@ -17,6 +17,12 @@ class CourseScheduler:
             startup_action: 启动时要执行的动作
         """
         self.startup_action = startup_action
+        self.last_second = -1  # 记录上次更新的秒数
+        # 预计算并缓存icon路径
+        base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+        self.icon_path = os.path.join(base_path, 'res', 'icon.ico')
+        # 初始化课程时间缓存
+        self._course_time_cache = {}
         try:
             logger.log_debug("Initializing CourseScheduler application")
             # 先初始化配置
@@ -62,6 +68,10 @@ class CourseScheduler:
         """创建并配置主窗口"""
         root = tk.Tk()
         root.title("课程表")
+        
+        # 使用缓存的icon路径
+        
+        # 简化窗口属性设置
         root.overrideredirect(True)  # 无边框
         root.resizable(False, False)  # 固定比例
         root.protocol("WM_DELETE_WINDOW", self.cleanup_resources)  # 退出时清理资源
@@ -318,9 +328,18 @@ class CourseScheduler:
         """更新主界面显示内容"""
         try:
             now = datetime.now()
-            self._update_time_display(now)
-            self._update_countdown_display(now)
-            self._update_schedule_display(now)
+            current_second = now.second
+            
+            # 缓存当前时间对象避免重复计算
+            current_time = now.time()
+            
+            # 只有秒数变化时才更新UI
+            if current_second != self.last_second:
+                self._update_time_display(now)
+                self._update_countdown_display(now)
+                self._update_schedule_display(now)
+                self.last_second = current_second
+                
             self._schedule_next_update()
             
             # 检测窗口状态变化
@@ -382,10 +401,20 @@ class CourseScheduler:
             else:
                 self._create_new_label(course, color)
 
+
     def _get_course_color(self, now: datetime, course: Dict[str, str]) -> str:
         """根据课程时间获取显示颜色"""
-        start_time = datetime.strptime(course["start_time"], "%H:%M").time()
-        end_time = datetime.strptime(course["end_time"], "%H:%M").time()
+        # 使用课程名称+时间作为缓存键
+        cache_key = f"{course['name']}_{course['start_time']}_{course['end_time']}"
+        
+        # 从缓存获取或计算
+        if cache_key not in self._course_time_cache:
+            self._course_time_cache[cache_key] = (
+                datetime.strptime(course["start_time"], "%H:%M").time(),
+                datetime.strptime(course["end_time"], "%H:%M").time()
+            )
+            
+        start_time, end_time = self._course_time_cache[cache_key]
         current_time = now.time()
         
         if start_time <= current_time <= end_time:
@@ -397,22 +426,30 @@ class CourseScheduler:
     def _update_existing_label(self, index: int, course: Dict[str, str], color: str) -> None:
         """更新现有课程标签"""
         label = self.course_labels[index]
-        label.config(
-            text=f"{course['start_time']} {course['name']}"
-        )
-        if hasattr(label, 'status_canvas'):
-            # 根据当前字体大小更新色块尺寸
-            circle_size = int(self.config_handler.schedule_size * 1.2)
-            # 更新Canvas尺寸
-            label.status_canvas.config(width=circle_size, height=circle_size)
-            # 删除旧图形并创建新尺寸的圆形
-            label.status_canvas.delete(label.status_canvas.oval_id)
-            oval_id = label.status_canvas.create_oval(0, 0, circle_size, circle_size, fill=color, outline=color)
-            label.status_canvas.oval_id = oval_id
-            # 更新颜色
-            label.status_canvas.config(bg=color)
-        # 提升该课程标签的显示层级
-        label.master.lift()  # 通过调整父容器的层级确保显示在最前   
+        new_text = f"{course['start_time']} {course['name']}"
+        
+        # 只有文本或颜色变化时才更新
+        if label.cget("text") != new_text or (hasattr(label, 'last_color') and label.last_color != color):
+            label.config(text=new_text)
+            label.last_color = color
+            
+            if hasattr(label, 'status_canvas'):
+                # 缓存字体大小计算
+                if not hasattr(label, 'cached_circle_size'):
+                    label.cached_circle_size = int(self.config_handler.schedule_size * 1.2)
+                
+                circle_size = label.cached_circle_size
+                label.status_canvas.config(width=circle_size, height=circle_size)
+                
+                # 只有颜色变化时才重绘Canvas
+                if hasattr(label.status_canvas, 'current_color') and label.status_canvas.current_color != color:
+                    label.status_canvas.delete("all")
+                    label.status_canvas.create_oval(0, 0, circle_size, circle_size, fill=color, outline=color)
+                    label.status_canvas.current_color = color
+                    label.status_canvas.config(bg=color)
+            
+            # 提升该课程标签的显示层级
+            label.master.lift()
 
     def _update_font_settings(self) -> None:
         """更新所有UI组件的字体设置"""

@@ -5,14 +5,17 @@ from queue import Queue
 from datetime import datetime
 from pathlib import Path
 from constants import CONFIG_FILE
+from concurrent.futures import ThreadPoolExecutor
 
 class AppLogger:
     def __init__(self):
+        # 初始化线程池用于异步任务
         self.log_dir = Path("logs")
         self._env_logged = False
         # 创建异步日志队列和监听器
         self.log_queue = Queue(-1)  # 无限容量队列
         self.queue_listener = None
+        self.executor = ThreadPoolExecutor(max_workers=2)
         try:
             # 尝试创建日志目录
             self.log_dir.mkdir(exist_ok=True)
@@ -32,14 +35,18 @@ class AppLogger:
         self._setup_logger()
 
     def _clean_empty_logs(self):
-        """清理日志目录中的空日志文件"""
-        try:
-            for log_file in self.log_dir.glob("*.log"):
-                if log_file.stat().st_size == 0:
-                    log_file.unlink()
-                    self.logger.debug(f"Deleted empty log file: {log_file}") if hasattr(self, 'logger') else None
-        except Exception as e:
-            self.logger.error(f"Failed to clean empty logs: {str(e)}") if hasattr(self, 'logger') else None
+        """异步清理空日志文件"""
+        def cleanup_task():
+            try:
+                for log_file in self.log_dir.glob("*.log"):
+                    if log_file.stat().st_size == 0:
+                        log_file.unlink()
+                        self.logger.debug(f"Deleted empty log file: {log_file}")
+            except Exception as e:
+                self.logger.error(f"Failed to clean empty logs: {str(e)}")
+        
+        # 提交异步清理任务
+        self.executor.submit(cleanup_task)
 
     def _setup_logger(self):
         from config_handler import ConfigHandler
@@ -106,22 +113,37 @@ class AppLogger:
     def shutdown(self):
         """安全关闭日志系统"""
         if self.queue_listener:
-            self.queue_listener.stop()
+            # 异步停止监听器并关闭线程池
+            def stop_listener():
+                self.queue_listener.stop()
+                if hasattr(self, 'executor') and self.executor:
+                    self.executor.shutdown(wait=False)
+            threading.Thread(target=stop_listener, daemon=True).start()
 
     def log_debug(self, debug):
+        # 分离环境信息记录
+        if not self._env_logged:
+            self._log_environment()
+        
+        # 直接记录调试信息
+        self.logger.debug(str(debug))
+
+    def _log_environment(self):
+        """记录环境信息（只执行一次）"""
         import platform
         import os
         import sys
         
-        debug_info = str(debug)
+        env_info = [
+            f"System: {platform.system()} {platform.release()}",
+            f"Python: {sys.version}",
+            f"Working Directory: {os.getcwd()}",
+            f"Environment Variables: {dict(os.environ)}"
+        ]
         
-        if not self._env_logged:
-            debug_info += f"\nSystem: {platform.system()} {platform.release()}\n"
-            debug_info += f"Python: {sys.version}\n"
-            debug_info += f"Working Directory: {os.getcwd()}\n"
-            debug_info += f"Environment Variables: {dict(os.environ)}"
-            self._env_logged = True
+        for line in env_info:
+            self.logger.debug(line)
         
-        self.logger.debug(debug_info)
+        self._env_logged = True
 
 logger = AppLogger()
