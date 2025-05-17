@@ -115,10 +115,6 @@ def create_shortcut(target, shortcut_path):
         # 删除临时文件
         os.remove(temp_vbs)
         
-    except Exception as e:
-        logger.log_error(f"快捷方式创建失败: {str(e)}")
-        messagebox.showerror("错误", "无法创建快捷方式，请手动创建")
-
 def check_installation():
     """主安装检查逻辑"""
     # 程序启动时清理残留的计划任务
@@ -217,7 +213,7 @@ def check_installation():
         # 复制图标文件
         src_icon = os.path.join(os.path.dirname(get_executable_path()), "res", "icon.ico")
         if hasattr(sys, '_MEIPASS'):
-            src_icon = os.path.join(sys._MEIPASS, "res", "icon.ico")
+            src_icon = os.path.join(sys._MEIPASS, "res", "icon.ico") # type: ignore
         
         if os.path.exists(src_icon):
             shutil.copy2(src_icon, os.path.join(target_dir, "res", "icon.ico"))

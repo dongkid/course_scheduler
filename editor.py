@@ -1,3 +1,4 @@
+from typing import List
 import tkinter as tk
 import uuid
 import time
@@ -322,7 +323,7 @@ class EditorWindow:
 
     def _create_notebook(self) -> None:
         """创建标签页"""
-        self.notebook = tk.ttk.Notebook(self.window, style="TNotebook")
+        self.notebook = ttk.Notebook(self.window, style="TNotebook")
         self.notebook.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
         
         # 预创建所有标签页并设置白色背景
@@ -379,35 +380,34 @@ class EditorWindow:
 
     def _select_all(self):
         """全选/取消全选当前标签页的所有课程行"""
-        # 获取当前标签页索引
+        BG_COLOR_SELECTED = "#e3f2fd"
+        BG_COLOR_DEFAULT = "white"
+        
         current_tab_index = self.notebook.index(self.notebook.select())
         current_day_frame = self.day_frames[current_tab_index]
         
-        # 检查当前标签页是否已全选
-        all_selected = True
-        for row_frame in current_day_frame.winfo_children():
-            if isinstance(row_frame, tk.Frame) and hasattr(row_frame, 'row_id'):
-                if row_frame.row_id not in self.selected_rows:
-                    all_selected = False
-                    break
+        # 收集当前标签页所有有效行ID
+        row_ids = set()
+        for widget in current_day_frame.winfo_children():
+            if isinstance(widget, tk.Frame) and hasattr(widget, 'row_id'):
+                row_ids.add(widget.row_id) # type: ignore
         
-        # 切换当前标签页的选择状态
-        for row_frame in current_day_frame.winfo_children():
-            if isinstance(row_frame, tk.Frame) and hasattr(row_frame, 'row_id'):
-                if all_selected:
-                    # 取消全选
-                    if row_frame.row_id in self.selected_rows:
-                        self.selected_rows.remove(row_frame.row_id)
-                        row_frame.config(bg="white")
-                        if hasattr(row_frame, 'check_var'):
-                            row_frame.check_var.set(0)
-                else:
-                    # 全选当前标签页
-                    if row_frame.row_id not in self.selected_rows:
-                        self.selected_rows.add(row_frame.row_id)
-                        row_frame.config(bg="#e3f2fd")
-                        if hasattr(row_frame, 'check_var'):
-                            row_frame.check_var.set(1)
+        # 判断全选状态时使用集合包含关系
+        all_selected = row_ids.issubset(self.selected_rows)
+        
+        # 批量更新选中状态
+        if all_selected:
+            self.selected_rows -= row_ids
+        else:
+            self.selected_rows.update(row_ids)
+        
+        # 单次遍历更新界面状态
+        for widget in current_day_frame.winfo_children():
+            if isinstance(widget, tk.Frame) and hasattr(widget, 'row_id'):
+                is_selected = widget.row_id in self.selected_rows # type: ignore
+                widget.config(bg=BG_COLOR_SELECTED if is_selected else BG_COLOR_DEFAULT)
+                if hasattr(widget, 'check_var'):
+                    widget.check_var.set(1 if is_selected else 0) # type: ignore
 
     def _create_save_button(self) -> None:
         """创建保存按钮"""
@@ -489,19 +489,19 @@ class EditorWindow:
         
         self.notebook.bind("<<NotebookTabChanged>>", on_tab_change)
     
-    def add_course_row(self, frame, index, course=None):
-        row_frame = tk.Frame(frame, bg="white", bd=0, relief=tk.FLAT)
+    def add_course_row(self, parent_frame, index, course=None):
+        row_frame = tk.Frame(parent_frame, bg="white", bd=0, relief=tk.FLAT)
         row_frame.pack(fill=tk.X, pady=4, padx=2)
         # 生成唯一且稳定的行ID
         row_id = str(uuid.uuid4())[:8].upper()  # 使用UUID前8位大写字符
-        row_frame.row_id = row_id  # 存储唯一ID
+        row_frame.row_id = row_id  # type: ignore # 存储唯一ID
         
         
         # 添加勾选框
-        row_frame.check_var = tk.IntVar()
+        row_frame.check_var = tk.IntVar() # type: ignore
         checkbutton = ttk.Checkbutton(
             row_frame,
-            variable=row_frame.check_var,
+            variable=row_frame.check_var, # type: ignore
             command=lambda: self._toggle_row_selection(row_id, row_frame),
             style="Editor.TCheckbutton"
         )
@@ -715,7 +715,7 @@ class EditorWindow:
         ]
         # 按Y坐标排序并添加调试日志
         children = sorted(children, key=lambda w: w.winfo_y())
-        logger.log_debug(f"[子元素列表] {[child.row_id for child in children]}")
+        logger.log_debug(f"[子元素列表] {[child.row_id for child in children]}") # type: ignore
         
         # 初始化rows_data前检查有效性
         if not children:
@@ -738,18 +738,7 @@ class EditorWindow:
             visible_rows.sort(key=lambda w: w.winfo_y())
             
             # 更新内存中的课程顺序
-            current_day_schedule = []
-            for row in visible_rows:
-                entries = [w for w in row.winfo_children() if isinstance(w, tk.Entry)]
-                if len(entries) >= 3:
-                    current_day_schedule.append({
-                        "start_time": entries[0].get(),
-                        "end_time": entries[1].get(),
-                        "name": entries[2].get()
-                    })
-            
-            # 立即更新内存数据
-            self.main_app.schedule["schedules"][self.current_schedule][day_str] = current_day_schedule
+            # 不立即更新内存数据，等待保存操作
             # 收集所有行的打包信息（带存在性检查）
             rows_data = []
             for child in children:
@@ -764,11 +753,11 @@ class EditorWindow:
                         }
                     })
                 else:
-                    logger.log_debug(f"跳过已销毁元素: {child.row_id}")
+                    logger.log_debug(f"跳过已销毁元素: {child.row_id}") # type: ignore
 
         except Exception as e:
             logger.log_error(f"初始化行数据失败: {str(e)}")
-            logger.log_debug(f"[错误上下文] children={[c.row_id for c in children]}")
+            logger.log_debug(f"[错误上下文] children={[c.row_id for c in children]}") # type: ignore
             return
         
         try:
@@ -782,7 +771,7 @@ class EditorWindow:
                 
             # 详细调试日志
             logger.log_debug(f"[移动操作] 方向:{direction} 当前索引:{index}->新索引:{new_index}")
-            logger.log_debug(f"[移动前顺序] {[child.row_id for child in children]}")
+            logger.log_debug(f"[移动前顺序] {[child.row_id for child in children]}") # type: ignore
                 
             # 收集所有行的当前状态
             rows_data = []
@@ -807,7 +796,7 @@ class EditorWindow:
                     if child.winfo_exists():
                         child.pack_forget()
                     else:
-                        logger.log_debug(f"元素{child.row_id}已不存在，跳过")
+                        logger.log_debug(f"元素{child.row_id}已不存在，跳过") # type: ignore
                 
                 for i, item in enumerate(rows_data):
                     if item['widget'].winfo_exists():
@@ -834,7 +823,7 @@ class EditorWindow:
                     f"[{log_id}] 行移动追踪 | "
                     f"星期:{weekday} | "
                     # 使用实际0-based索引显示
-                    f"逻辑索引:{index}→{new_index} | 可视顺序:{[c.row_id for c in children]} | 物理位置:{[c.winfo_y() for c in children]} | "
+                    f"逻辑索引:{index}→{new_index} | 可视顺序:{[c.row_id for c in children]} | 物理位置:{[c.winfo_y() for c in children]} | " # type: ignore
                     f"时间:{start_time}-{end_time} | "
                     f"课程:'{course_name}'"
                 )
@@ -852,7 +841,7 @@ class EditorWindow:
                 and hasattr(child, 'check_var')
                 and child.winfo_ismapped()
             ]
-            logger.log_debug(f"[错误时子元素] {[child.row_id for child in current_children]}")
+            logger.log_debug(f"[错误时子元素] {[child.row_id for child in current_children]}") # type: ignore
             logger.log_debug(f"[当前行Frame状态] winfo_exists: {row_frame.winfo_exists()}, row_id: {getattr(row_frame, 'row_id', '未知')}")
             
             # 安全恢复逻辑（带存在性检查）
@@ -863,7 +852,7 @@ class EditorWindow:
                         if child.winfo_exists():
                             child.pack_forget()
                         else:
-                            logger.log_debug(f"元素{child.row_id}已不存在，跳过")
+                            logger.log_debug(f"元素{child.row_id}已不存在，跳过") # type: ignore
                     
                     for row in rows_data:
                         if row['widget'].winfo_exists():
@@ -885,12 +874,10 @@ class EditorWindow:
                     if isinstance(child, tk.Frame) and
                     hasattr(child, 'row_id')
                 ]
-                logger.log_debug(f"[恢复后顺序] {[child.row_id for child in restored_children]}")
+                logger.log_debug(f"[恢复后顺序] {[child.row_id for child in restored_children]}") # type: ignore
             except:
                 logger.log_error("恢复原始布局失败")
             
-        except (ValueError, IndexError) as e:
-            logger.log_error(f"移动课程行出错: {str(e)}")
         
 
     def _batch_delete(self):
@@ -904,7 +891,7 @@ class EditorWindow:
             for day_frame in self.day_frames:
                 for row_frame in day_frame.winfo_children():
                     if isinstance(row_frame, tk.Frame) and hasattr(row_frame, 'row_id'):
-                        if row_frame.row_id in self.selected_rows:
+                        if row_frame.row_id in self.selected_rows: # type: ignore
                             row_frame.destroy()
                             
             self.selected_rows.clear()
@@ -921,7 +908,7 @@ class EditorWindow:
         for day_frame in self.day_frames:
             for row_frame in day_frame.winfo_children():
                 if isinstance(row_frame, tk.Frame) and hasattr(row_frame, 'row_id'):
-                    if row_frame.row_id in self.selected_rows:
+                    if row_frame.row_id in self.selected_rows: # type: ignore
                         entries = [w for w in row_frame.winfo_children() if isinstance(w, tk.Entry)]
                         if len(entries) >= 3:
                             courses_data.append({
