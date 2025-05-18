@@ -52,6 +52,9 @@ class EditorWindow:
             self.window = self._create_window()
             self._init_styles()  # 初始化样式
             self.day_frames: List[tk.Frame] = []
+            # 确保存在last_modified字段
+            if "last_modified" not in self.main_app.schedule:
+                self.main_app.schedule["last_modified"] = datetime.now().timestamp()
             self.current_schedule = self.main_app.schedule["current_schedule"]
             self.all_courses = self._get_all_courses()  # 初始化时加载所有课程
             self.schedule_times = {}  # 按课表存储课程时间
@@ -161,6 +164,7 @@ class EditorWindow:
             
         try:
             # 重命名课表数据
+            self.main_app.schedule["last_modified"] = datetime.now().timestamp() if "last_modified" in self.main_app.schedule else datetime.now().timestamp()
             self.main_app.schedule["schedules"][new_name] = self.main_app.schedule["schedules"].pop(old_name)
             # 更新当前课表名称
             self.current_schedule = new_name
@@ -198,6 +202,7 @@ class EditorWindow:
         }
         
         # 添加新课表
+        self.main_app.schedule["last_modified"] = datetime.now().timestamp()
         self.main_app.schedule["schedules"][new_name] = new_schedule
         self.schedule_times[new_name] = self.schedule_times[current_name].copy()
         
@@ -233,6 +238,7 @@ class EditorWindow:
 
     def _delete_schedule(self):
         """删除当前课表"""
+        self.main_app.schedule["last_modified"] = datetime.now().timestamp()
         if len(self.main_app.schedule["schedules"]) <= 1:
             messagebox.showwarning("警告", "至少需要保留一个课表")
             return
@@ -585,7 +591,7 @@ class EditorWindow:
             try:
                 # 获取当前行之前的最后一行
                 previous_row = None
-                for widget in frame.winfo_children():
+                for widget in parent_frame.winfo_children():
                     if isinstance(widget, tk.Frame) and widget != row_frame:
                         previous_row = widget
                 
@@ -983,22 +989,34 @@ class EditorWindow:
                                 if current_text.lower() in course.lower()]
     
     def _get_all_courses(self):
-        """获取所有历史课程名称"""
-        all_courses = set()
-        # 遍历当前课表
+        """获取所有历史课程名称（带缓存机制）"""
+        # 使用缓存校验
+        if hasattr(self, '_courses_cache'):
+            cache_data, schedule_name, modified_time = self._courses_cache
+            if (schedule_name == self.current_schedule and
+                modified_time == self.main_app.schedule["last_modified"]):
+                return cache_data
+        
+        # 使用集合推导式收集课程名称
         current_schedule = self.main_app.schedule["schedules"][self.current_schedule]
-        for day in current_schedule.values():
-            for course in day:
-                all_courses.add(course["name"])
+        all_courses = {
+            course["name"]
+            for day in current_schedule.values()
+            for course in day
+        }
         
-        # 获取默认课程
-        default_courses = self.main_app.config_handler.default_courses
+        # 优化默认课程处理：使用集合操作
+        default_set = set(self.main_app.config_handler.default_courses)
+        filtered_defaults = list(default_set - all_courses)
         
-        # 过滤掉用户历史课程中已存在的默认课程
-        filtered_default_courses = [course for course in default_courses if course not in all_courses]
-        
-        # 合并用户历史课程和过滤后的默认课程
-        return sorted(all_courses, reverse=True) + filtered_default_courses
+        # 合并结果并缓存
+        result = sorted(all_courses) + filtered_defaults
+        self._courses_cache = (
+            result,
+            self.current_schedule,
+            self.main_app.schedule.get("last_modified", datetime.now().timestamp())
+        )
+        return result
     
     def save(self):
         try:
@@ -1066,6 +1084,7 @@ class EditorWindow:
             selected_tab = self.notebook.index(self.notebook.select())
             self.last_edited_day = str(selected_tab)
             
+            self.main_app.schedule["last_modified"] = datetime.now().timestamp()
             self.main_app.save_schedule()
             
             # 保存后立即刷新当前标签页

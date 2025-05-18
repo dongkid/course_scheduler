@@ -1,8 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
 from typing import Callable
-from tools.fullscreen_time import FullscreenTimeWindow
-from tools.weather import WeatherTool
 
 class ToolsWindow:
     """小工具窗口类"""
@@ -95,6 +93,7 @@ class ToolsWindow:
         
     def _show_fullscreen_time(self):
         """显示全屏大号时间"""
+        from tools.fullscreen_time import FullscreenTimeWindow
         self.fullscreen_time_window = FullscreenTimeWindow(self.root, self.config_handler)
         self.fullscreen_time_window.show()
         
@@ -105,5 +104,6 @@ class ToolsWindow:
         
     def _show_weather(self):
         """显示天气"""
+        from tools.weather import WeatherTool
         self.weather_tool = WeatherTool()
         self.weather_tool.show()

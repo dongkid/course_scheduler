@@ -377,16 +377,23 @@ class CourseScheduler:
         weekday = str(now.weekday())
         today_schedule = self.schedule["schedules"][self.schedule["current_schedule"]].get(weekday, [])
         
+        # 在更新前清除所有课程时间缓存
+        self._course_time_cache.clear()
+        
         # 过滤掉已销毁的标签
         self.course_labels = [label for label in self.course_labels if label.winfo_exists()]
         
-        # 仅更新或创建必要的标签
+        # 根据当前课表重新排列所有标签
         for i, course in enumerate(today_schedule):
             color = self._get_course_color(now, course)
             if i < len(self.course_labels):
-                self._update_existing_label(i, course, color)
+                # 强制更新标签颜色状态
+                self._update_existing_label(i, course, color, force_update=True)
+                # 调整grid行号
+                self.course_labels[i].master.grid(row=i)
             else:
-                self._create_new_label(course, color)
+                # 创建新标签并指定grid行号
+                self._create_new_label(course, color, row=i)
         
         # 移除多余的标签
         self._remove_extra_labels(today_schedule)
@@ -423,33 +430,31 @@ class CourseScheduler:
             return "green"   # 已上完的课程为绿色
         return "red"     # 未上过的课程为红色
 
-    def _update_existing_label(self, index: int, course: Dict[str, str], color: str) -> None:
+    def _update_existing_label(self, index: int, course: Dict[str, str], color: str, force_update: bool = False) -> None:
         """更新现有课程标签"""
         label = self.course_labels[index]
         new_text = f"{course['start_time']} {course['name']}"
         
-        # 只有文本或颜色变化时才更新
-        if label.cget("text") != new_text or (hasattr(label, 'last_color') and label.last_color != color):
-            label.config(text=new_text)
-            label.last_color = color
+        # 始终更新文本和颜色状态
+        label.config(text=new_text)
+        label.last_color = color
+        
+        if hasattr(label, 'status_canvas'):
+            # 缓存字体大小计算
+            if not hasattr(label, 'cached_circle_size'):
+                label.cached_circle_size = int(self.config_handler.schedule_size * 1.2)
             
-            if hasattr(label, 'status_canvas'):
-                # 缓存字体大小计算
-                if not hasattr(label, 'cached_circle_size'):
-                    label.cached_circle_size = int(self.config_handler.schedule_size * 1.2)
-                
-                circle_size = label.cached_circle_size
-                label.status_canvas.config(width=circle_size, height=circle_size)
-                
-                # 只有颜色变化时才重绘Canvas
-                if hasattr(label.status_canvas, 'current_color') and label.status_canvas.current_color != color:
-                    label.status_canvas.delete("all")
-                    label.status_canvas.create_oval(0, 0, circle_size, circle_size, fill=color, outline=color)
-                    label.status_canvas.current_color = color
-                    label.status_canvas.config(bg=color)
+            circle_size = label.cached_circle_size
+            label.status_canvas.config(width=circle_size, height=circle_size)
             
-            # 提升该课程标签的显示层级
-            label.master.lift()
+            # 强制重绘Canvas
+            label.status_canvas.delete("all")
+            label.status_canvas.create_oval(0, 0, circle_size, circle_size, fill=color, outline=color)
+            label.status_canvas.current_color = color
+            label.status_canvas.config(bg=color)
+        
+        # 提升该课程标签的显示层级
+        label.master.lift()
 
     def _update_font_settings(self) -> None:
         """更新所有UI组件的字体设置"""
@@ -511,10 +516,10 @@ class CourseScheduler:
         # 强制更新所有部件
         self.root.update_idletasks()
 
-    def _create_new_label(self, course: Dict[str, str], color: str) -> None:
+    def _create_new_label(self, course: Dict[str, str], color: str, row: int) -> None:
         """创建新课程标签"""
         course_frame = tk.Frame(self.schedule_frame)
-        course_frame.grid(row=len(self.course_labels), column=0, sticky="ew", pady=2)
+        course_frame.grid(row=row, column=0, sticky="ew", pady=2)  # 使用指定的行号
         
         label = tk.Label(
             course_frame,
@@ -545,10 +550,13 @@ class CourseScheduler:
 
     def _remove_extra_labels(self, schedule: List[Dict[str, str]]) -> None:
         """移除多余的课程标签"""
-        while len(self.course_labels) > len(schedule):
-            last_label = self.course_labels.pop()
-            last_label.pack_forget()
-            last_label.status_canvas.pack_forget()
+        # 移除所有超出当前课程数量的标签
+        for i in range(len(schedule), len(self.course_labels)):
+            if i < len(self.course_labels):
+                label = self.course_labels[i]
+                label.master.destroy()  # 销毁整个课程框架
+        # 更新标签列表
+        self.course_labels = self.course_labels[:len(schedule)]
 
     def _schedule_next_update(self) -> None:
         """安排下一次界面更新"""
