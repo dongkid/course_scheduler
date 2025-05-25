@@ -5,6 +5,8 @@ import sys
 import os
 from tkinter import PhotoImage
 from constants import APP_NAME, VERSION, PROJECT_URL
+import threading
+from tkinter import messagebox
 
 # 配置ttk样式
 def configure_styles():
@@ -13,6 +15,7 @@ def configure_styles():
     style.configure("AboutWindow.TLabel", background="white", font=("Microsoft YaHei", 8), padding=0)
     style.configure("AboutWindow.Title.TLabel", font=("Microsoft YaHei", 12, "bold"), padding=0)
     style.configure("AboutWindow.Url.TLabel", foreground="blue", font=("Microsoft YaHei", 5, "underline"), padding=0)
+    style.configure("AboutWindow.TButton", font=("Microsoft YaHei", 8), padding=2)
     style.layout("AboutWindow.TFrame", [])
     style.layout("AboutWindow.TLabel", [])
 
@@ -102,3 +105,45 @@ class AboutWindow:
         license_frame = ttk.Frame(info_frame, style="AboutWindow.TFrame")
         license_frame.pack(fill=tk.X, pady=2)
         ttk.Label(license_frame, text="开源协议: GNU General Public License v3.0", style="AboutWindow.TLabel").pack(anchor=tk.W)
+
+        # 检查更新按钮
+        update_frame = ttk.Frame(info_frame, style="AboutWindow.TFrame")
+        update_frame.pack(fill=tk.X, pady=2)
+        
+        self.check_update_btn = ttk.Button(
+            update_frame,
+            text="检查更新",
+            style="AboutWindow.TButton",
+            command=self.start_update_check
+        )
+        self.check_update_btn.pack(side=tk.RIGHT, padx=10)
+
+    def start_update_check(self):
+        """启动异步更新检查"""
+        self.check_update_btn.config(state=tk.DISABLED, text="检查中...")
+        threading.Thread(target=self._perform_update_check, daemon=True).start()
+
+    def _perform_update_check(self):
+        """执行实际的更新检查"""
+        import update_checker  # 延迟导入
+        try:
+            latest_version, release_url = update_checker.UpdateChecker.check_for_updates()
+        except Exception as e:
+            latest_version = None
+            release_url = None
+            print(f"更新检查失败: {e}")
+        self.window.after(0, lambda: self._handle_update_result(latest_version, release_url))
+
+    def _handle_update_result(self, latest_version, release_url):
+        """处理更新检查结果"""
+        self.check_update_btn.config(state=tk.NORMAL, text="检查更新")
+        if latest_version:
+            if messagebox.askyesno("发现新版本", f"发现新版本 {latest_version}，是否立即前往下载？"):
+                if sys.platform == 'win32':
+                    subprocess.Popen(['start', release_url], shell=True)
+                elif sys.platform == 'darwin':
+                    subprocess.Popen(['open', release_url])
+                else:
+                    subprocess.Popen(['xdg-open', release_url])
+        else:
+            messagebox.showinfo("检查更新", "当前已是最新版本")
