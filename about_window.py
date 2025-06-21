@@ -6,8 +6,6 @@ import os
 from tkinter import PhotoImage
 from constants import APP_NAME, VERSION, PROJECT_URL
 import threading
-from tkinter import messagebox
-from updater import Updater
 
 # 配置ttk样式
 def configure_styles():
@@ -27,6 +25,7 @@ class AboutWindow:
         self.parent = self.app.root
         self.window = self._create_window()
         self._initialize_ui()
+        self._start_updater_preload()
 
     def _create_window(self) -> tk.Toplevel:
         """创建并配置关于窗口"""
@@ -37,6 +36,19 @@ class AboutWindow:
         window.maxsize(600, 240)  # 设置窗口最大大小
         window.configure(bg="white")
         return window
+
+    def _start_updater_preload(self):
+        """在后台线程中预加载Updater模块。"""
+        threading.Thread(target=self._preload_updater_task, daemon=True).start()
+
+    def _preload_updater_task(self):
+        """预加载Updater模块和实例的任务。"""
+        # 检查updater实例是否已存在，避免重复创建
+        if not hasattr(self.app, 'updater') or not self.app.updater:
+            from updater import Updater
+            # 再次检查，以防在导入期间主线程已创建实例（处理竞态条件）
+            if not hasattr(self.app, 'updater') or not self.app.updater:
+                self.app.updater = Updater(self.app.root)
 
     def _update_font_size(self, event=None):
         """根据窗口宽度动态调整所有文本字体大小"""

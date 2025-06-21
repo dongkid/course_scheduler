@@ -3,13 +3,21 @@ import re
 import threading
 import tkinter as tk
 from tkinter import messagebox, ttk
-from typing import Tuple, Optional, Dict, Any, Callable
+from typing import Tuple, Optional, Dict, Any, Callable, List
+import os
+import math
+from queue import Queue
 
 from constants import VERSION, PROJECT_URL, GITHUB_DOMAIN, VERSION_PATTERN
 from logger import logger
 
 import time
 import socket
+
+# --- Constants for Multi-threaded Download ---
+CHUNK_SIZE = 512 * 1024  # 512KB per chunk for fine-grained task queue
+MAX_THREADS = 10  # Max number of download threads
+DOWNLOAD_RETRY = 2 # Retries for a single chunk
 
 class Updater:
     """处理应用程序更新的类，包括检查、下载和安装。"""
@@ -24,9 +32,24 @@ class Updater:
         self.progress_bar: Optional[ttk.Progressbar] = None
         self.progress_label: Optional[tk.Label] = None
         self.speed_label: Optional[tk.Label] = None
+        self.cancel_button: Optional[tk.Button] = None
         self._update_lock = threading.Lock()
         self._current_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
+        self.max_retries = 3
+        self.retry_delay = 5
+        
+        # --- For multi-threaded download ---
+        self.download_threads: List[threading.Thread] = []
+        self.task_queue: Optional[Queue] = None
+        self.shared_progress: Dict[str, Any] = {
+            "lock": threading.Lock(),
+            "downloaded_bytes": 0,
+            "total_bytes": 0,
+            "start_time": 0,
+            "error": None,
+            "part_paths": []
+        }
 
     def _is_newer(self, remote_version: str, local_version: str) -> bool:
         """比较版本号，返回远程版本是否更新。"""
@@ -92,24 +115,50 @@ class Updater:
             logger.log_warning(f"网络连接失败: {e}")
             return False
 
+    def _configure_styles(self):
+        """配置下载窗口的ttk样式。"""
+        style = ttk.Style()
+        style.configure("Updater.TFrame", background="white")
+        style.configure("Updater.TLabel", background="white", font=("Microsoft YaHei", 9))
+        style.configure("Updater.TButton", font=("Microsoft YaHei", 9))
+        # 为进度条创建一个自定义样式
+        style.configure("Updater.Horizontal.TProgressbar", troughcolor='white', background='#0078D7', bordercolor='white', lightcolor='#0078D7', darkcolor='#0078D7')
+
+
     def _create_progress_window(self):
         """创建并显示下载进度窗口。"""
+        self._configure_styles() # 应用样式
+
         self.progress_window = tk.Toplevel(self.parent_window)
         self.progress_window.title("正在下载更新")
-        self.progress_window.geometry("350x150")
+        self.progress_window.configure(bg="white")
+
+        window_width = 350
+        window_height = 180
+        screen_width = self.progress_window.winfo_screenwidth()
+        screen_height = self.progress_window.winfo_screenheight()
+        position_x = (screen_width // 2) - (window_width // 2)
+        position_y = (screen_height // 2) - (window_height // 2)
+        self.progress_window.geometry(f"{window_width}x{window_height}+{position_x}+{position_y}")
+
         self.progress_window.transient(self.parent_window)
         self.progress_window.grab_set()
-        self.progress_window.protocol("WM_DELETE_WINDOW", lambda: None)  # 禁用关闭按钮
+        self.progress_window.protocol("WM_DELETE_WINDOW", self._stop_current_thread)
 
-        self.progress_label = tk.Label(self.progress_window, text="正在准备下载...")
-        self.progress_label.pack(pady=10)
+        main_frame = ttk.Frame(self.progress_window, style="Updater.TFrame")
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
 
-        self.progress_bar = ttk.Progressbar(self.progress_window, orient="horizontal", length=320, mode="determinate")
-        self.progress_bar.pack(pady=10)
+        self.progress_label = ttk.Label(main_frame, text="正在准备下载...", style="Updater.TLabel")
+        self.progress_label.pack(pady=(0, 5), anchor='w')
 
-        self.speed_label = tk.Label(self.progress_window, text="")
-        self.speed_label.pack(pady=5)
+        self.progress_bar = ttk.Progressbar(main_frame, orient="horizontal", length=320, mode="determinate", style="Updater.Horizontal.TProgressbar")
+        self.progress_bar.pack(pady=5, fill=tk.X, expand=True)
 
+        self.speed_label = ttk.Label(main_frame, text="", style="Updater.TLabel")
+        self.speed_label.pack(pady=(0, 10), anchor='w')
+
+        self.cancel_button = ttk.Button(main_frame, text="取消", command=self._stop_current_thread, style="Updater.TButton")
+        self.cancel_button.pack(side=tk.RIGHT)
     def _update_progress(self, current_bytes, total_bytes, start_time):
         """更新进度条和标签，包括下载速度和剩余时间。"""
         if not self.progress_window or not self.progress_window.winfo_exists():
@@ -127,8 +176,12 @@ class Updater:
         percent = (current_bytes / total_bytes) * 100 if total_bytes > 0 else 0
         self.progress_bar['value'] = percent
         self.progress_label.config(text=f"已下载 {current_bytes/1024/1024:.2f} MB / {total_bytes/1024/1024:.2f} MB")
-        self.speed_label.config(text=f"速度: {speed/1024:.2f} KB/s | 预计剩余: {eta:.0f} 秒")
-        self.progress_window.update_idletasks()
+        if speed >= 1024 * 1024:
+            speed_text = f"{speed / 1024 / 1024:.2f} MB/s"
+        else:
+            speed_text = f"{speed / 1024:.2f} KB/s"
+        
+        self.speed_label.config(text=f"速度: {speed_text} | 预计剩余: {eta:.0f} 秒")
 
     def _close_progress_window(self):
         """关闭进度窗口。"""
@@ -136,30 +189,216 @@ class Updater:
             self.progress_window.destroy()
             self.progress_window = None
 
-    def _download_update(self, download_url: str, destination_path: str) -> Optional[str]:
-        """在单独的线程中下载更新文件。"""
+    def _worker(self, url: str):
+        """工作线程，从队列中获取并下载块。"""
+        while not self._stop_event.is_set():
+            try:
+                task = self.task_queue.get_nowait()
+            except Exception: # Queue Empty
+                break # 队列为空，线程退出
+
+            part_path, start_byte, end_byte, retries = task
+            
+            try:
+                headers = {'Range': f'bytes={start_byte}-{end_byte}'}
+                response = requests.get(url, headers=headers, stream=True, timeout=30)
+                response.raise_for_status()
+
+                with open(part_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if self._stop_event.is_set():
+                            # 如果任务被中断，将其放回队列以便其他线程可以处理
+                            self.task_queue.put(task)
+                            return
+                        
+                        f.write(chunk)
+                        with self.shared_progress["lock"]:
+                            self.shared_progress["downloaded_bytes"] += len(chunk)
+                
+                self.task_queue.task_done()
+
+            except Exception as e:
+                if self._stop_event.is_set():
+                    self.task_queue.put(task) # 中断时放回任务
+                    return
+
+                logger.log_warning(f"下载块 {part_path} 失败: {e}。剩余重试次数: {retries}")
+                if retries > 0:
+                    # 失败，重新放入队列
+                    task = (part_path, start_byte, end_byte, retries - 1)
+                    self.task_queue.put(task)
+                else:
+                    logger.error(f"块 {part_path} 在所有重试后仍然失败。")
+                    with self.shared_progress["lock"]:
+                        self.shared_progress["error"] = e
+                    # 即使一个块失败，也标记为完成以避免死锁
+                    self.task_queue.task_done()
+                
+    def _combine_files(self, destination_path: str):
+        """将下载的分块合并成一个文件。"""
+        logger.log_info("开始合并文件分块...")
+        part_paths = sorted(self.shared_progress["part_paths"], key=lambda p: int(p.split('.part')[-1]))
+        try:
+            with open(destination_path, 'wb') as dest_file:
+                for part_path in part_paths:
+                    if not os.path.exists(part_path):
+                        logger.error(f"合并时未找到分块文件: {part_path}。下载可能不完整。")
+                        raise FileNotFoundError(f"Missing part file: {part_path}")
+                    with open(part_path, 'rb') as part_file:
+                        dest_file.write(part_file.read())
+            logger.log_info(f"文件成功合并到: {destination_path}")
+        finally:
+            # 清理临时分块文件
+            for part_path in part_paths:
+                if os.path.exists(part_path):
+                    try:
+                        os.remove(part_path)
+                    except OSError as e:
+                        logger.log_warning(f"删除临时文件 {part_path} 失败: {e}")
+
+    def _single_thread_download(self, download_url: str, destination_path: str) -> Optional[str]:
+        """原始的单线程下载逻辑，作为备用方案。"""
+        logger.log_info("回退到单线程下载模式。")
+        start_time = time.time()
         try:
             response = requests.get(download_url, stream=True, timeout=30)
             response.raise_for_status()
             total_size = int(response.headers.get('content-length', 0))
             
-            start_time = time.time()
+            downloaded_size = 0
             with open(destination_path, 'wb') as f:
-                downloaded_size = 0
                 for chunk in response.iter_content(chunk_size=8192):
                     if self._stop_event.is_set():
-                        logger.log_info("下载被中断。")
+                        logger.log_info("单线程下载被中断。")
                         return None
                     f.write(chunk)
                     downloaded_size += len(chunk)
                     self.parent_window.after(0, self._update_progress, downloaded_size, total_size, start_time)
             
+            logger.log_info("单线程文件下载成功。")
             return destination_path
-        except requests.exceptions.RequestException as e:
-            logger.log_error(f"下载失败: {e}")
-            self.parent_window.after(0, lambda: messagebox.showerror("下载失败", f"下载更新时出错:\n{e}"))
+        except Exception as e:
+            logger.log_error(f"单线程下载失败: {e}")
+            self.parent_window.after(0, lambda: messagebox.showerror("下载失败", f"无法下载更新文件。\n错误: {e}"))
+            return None
+
+    def _download_update(self, download_url: str, destination_path: str) -> Optional[str]:
+        """
+        使用基于工作队列的动态多线程下载更新文件。
+        """
+        all_temp_files = []
+        try:
+            # 1. 检查服务器能力 (带重试机制)
+            logger.log_info(f"开始下载: {download_url}")
+            head_response = None
+            for attempt in range(self.max_retries):
+                try:
+                    head_response = requests.head(download_url, timeout=10, allow_redirects=True)
+                    head_response.raise_for_status()
+                    break # 成功则跳出循环
+                except requests.exceptions.RequestException as e:
+                    logger.log_warning(f"获取文件头信息失败 (尝试 {attempt + 1}/{self.max_retries}): {e}")
+                    if attempt < self.max_retries - 1:
+                        time.sleep(self.retry_delay)
+                    else:
+                        raise # 所有重试失败后，重新引发异常
+
+            if not head_response:
+                 raise ConnectionError("无法获取文件元数据。")
+
+            total_size = int(head_response.headers.get('content-length', 0))
+            supports_range = head_response.headers.get('accept-ranges') == 'bytes'
+
+            if not total_size or not supports_range:
+                return self._single_thread_download(download_url, destination_path)
+
+            # 2. 创建任务队列
+            logger.log_info(f"文件总大小: {total_size / 1024 / 1024:.2f} MB。使用工作队列模式下载。")
+            self.task_queue = Queue()
+            
+            # 重置共享进度
+            self.shared_progress.update({
+                "downloaded_bytes": 0,
+                "total_bytes": total_size,
+                "start_time": time.time(),
+                "error": None,
+                "part_paths": []
+            })
+
+            # 填充任务队列
+            num_chunks = math.ceil(total_size / CHUNK_SIZE)
+            for i in range(num_chunks):
+                start_byte = i * CHUNK_SIZE
+                end_byte = min((i + 1) * CHUNK_SIZE - 1, total_size - 1)
+                part_path = f"{destination_path}.part{i}"
+                all_temp_files.append(part_path)
+                self.shared_progress["part_paths"].append(part_path)
+                task = (part_path, start_byte, end_byte, DOWNLOAD_RETRY)
+                self.task_queue.put(task)
+
+            # 3. 创建并启动工作线程
+            self.download_threads = []
+            thread_count = min(num_chunks, MAX_THREADS)
+            for _ in range(thread_count):
+                thread = threading.Thread(target=self._worker, args=(download_url,), daemon=True)
+                self.download_threads.append(thread)
+                thread.start()
+
+            # 4. 监控进度并等待完成
+            while not self.task_queue.empty():
+                if self._stop_event.is_set() or self.shared_progress["error"]:
+                    break
+                
+                with self.shared_progress["lock"]:
+                    downloaded = self.shared_progress["downloaded_bytes"]
+                    start_time = self.shared_progress["start_time"]
+                
+                self.parent_window.after(0, self._update_progress, downloaded, total_size, start_time)
+                time.sleep(0.2) # UI更新频率
+
+            self.task_queue.join() # 等待所有任务完成
+
+            # 5. 检查结果
+            if self._stop_event.is_set():
+                logger.log_info("下载被用户取消。")
+                return None
+            
+            if self.shared_progress["error"]:
+                err = self.shared_progress["error"]
+                logger.log_error(f"下载因错误而失败: {err}")
+                self.parent_window.after(0, lambda: messagebox.showerror("下载失败", f"下载更新时发生错误:\n{err}"))
+                return None
+
+            # 6. 合并文件
+            self._combine_files(destination_path)
+            
+            # 最终进度更新到100%
+            self.parent_window.after(0, self._update_progress, total_size, total_size, self.shared_progress["start_time"])
+            logger.log_info("工作队列下载成功。")
+            return destination_path
+
+        except Exception as e:
+            logger.log_error(f"下载失败 (严重错误): {e}")
+            if not self._stop_event.is_set():
+                # 修复lambda作用域问题
+                self.parent_window.after(0, lambda e=e: messagebox.showerror("下载失败", f"下载更新时发生严重错误:\n{e}"))
             return None
         finally:
+            # 确保所有临时文件在任何情况下都被清理
+            for temp_file in all_temp_files:
+                if os.path.exists(temp_file):
+                    try:
+                        os.remove(temp_file)
+                    except OSError:
+                        pass
+            
+            # 如果下载失败或取消，删除可能已创建的不完整目标文件
+            if os.path.exists(destination_path) and (self._stop_event.is_set() or self.shared_progress.get("error")):
+                 try:
+                    os.remove(destination_path)
+                 except OSError:
+                    pass
+
             self.parent_window.after(0, self._close_progress_window)
 
     def _install_update(self, downloaded_file_path: str):
@@ -236,7 +475,6 @@ del "%~f0"
         if self._update_lock.acquire(timeout=5):
             try:
                 self._stop_event.clear()
-                
                 if not self._check_network_connectivity():
                     if not silent:
                         messagebox.showerror("网络错误", "无法连接到GitHub更新服务器，请检查您的网络连接。")
@@ -279,11 +517,22 @@ del "%~f0"
             self.parent_window.after(0, lambda: self._install_update(downloaded_path))
 
     def _stop_current_thread(self):
-        """向当前运行的线程发送停止信号。"""
+        """向当前运行的线程发送停止信号，并更新UI。"""
         if self._current_thread and self._current_thread.is_alive():
-            logger.log_info(f"正在向线程 {self._current_thread.name} 发送停止信号。")
-            self._stop_event.set()
-            self.parent_window.after(0, self._close_progress_window)
+            logger.log_info(f"正在向主下载线程 {self._current_thread.name} 发送停止信号。")
+            self._stop_event.set() # 设置事件，所有子线程都会检查到
+
+            if self.cancel_button and self.cancel_button.winfo_exists():
+                self.cancel_button.config(state=tk.DISABLED, text="正在取消...")
+            if self.progress_label and self.progress_label.winfo_exists():
+                self.progress_label.config(text="正在取消下载...")
+            
+            # 等待所有下载线程终止
+            for thread in self.download_threads:
+                thread.join(timeout=2)
+
+            # 确保在UI更新后关闭窗口
+            self.parent_window.after(200, self._close_progress_window)
 
     def start_background_check(self):
         """
