@@ -82,6 +82,15 @@ class ToolsWindow:
         )
         weather_btn.pack(side=tk.LEFT, padx=10, pady=5)
         
+        # 数独按钮
+        sudoku_btn = ttk.Button(
+            button_frame,
+            text="数独",
+            command=self._show_sudoku,
+            style="TButton"
+        )
+        sudoku_btn.pack(side=tk.LEFT, padx=10, pady=5)
+        
         # 未完待续按钮
         todo_btn = ttk.Button(
             button_frame,
@@ -107,3 +116,8 @@ class ToolsWindow:
         from tools.weather import WeatherTool
         self.weather_tool = WeatherTool()
         self.weather_tool.show()
+        
+    def _show_sudoku(self):
+        """显示数独游戏"""
+        from tools.sudoku_ui import SudokuApp
+        self.sudoku_window = SudokuApp(self.root)
