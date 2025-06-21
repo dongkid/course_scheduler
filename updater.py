@@ -237,8 +237,11 @@ del "%~f0"
             try:
                 self._stop_event.clear()
                 
-                if not silent and not self._check_network_connectivity():
-                    messagebox.showerror("网络错误", "无法连接到GitHub更新服务器。")
+                if not self._check_network_connectivity():
+                    if not silent:
+                        messagebox.showerror("网络错误", "无法连接到GitHub更新服务器，请检查您的网络连接。")
+                    else:
+                        logger.log_info("网络连接不可用，静默更新检查已取消。")
                     return
 
                 latest_release = self.check_for_updates()
@@ -281,6 +284,20 @@ del "%~f0"
             logger.log_info(f"正在向线程 {self._current_thread.name} 发送停止信号。")
             self._stop_event.set()
             self.parent_window.after(0, self._close_progress_window)
+
+    def start_background_check(self):
+        """
+        在后台线程中启动静默更新流程。
+        """
+        if self._update_lock.locked():
+            logger.log_info("后台更新检查请求被忽略，因为更新流程已在运行。")
+            return
+            
+        background_thread = threading.Thread(
+            target=lambda: self.run_update_flow(silent=True),
+            daemon=True
+        )
+        background_thread.start()
 
 def main():
     """用于测试的临时入口点"""

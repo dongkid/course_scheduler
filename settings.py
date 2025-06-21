@@ -451,6 +451,17 @@ class SettingsWindow:
             style="White.TCheckbutton")
         self.debug_check.pack(side=tk.LEFT, padx=5)
 
+        # 自动更新设置
+        update_frame = ttk.LabelFrame(other_frame, text="自动更新", style="TFrame")
+        update_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        self.auto_update_check_var = tk.BooleanVar(value=self.main_app.config_handler.auto_update_check_enabled)
+        self.auto_update_check = ttk.Checkbutton(
+            update_frame, text="启动时检查更新",
+            variable=self.auto_update_check_var,
+            style="White.TCheckbutton")
+        self.auto_update_check.pack(side=tk.LEFT, padx=5)
+
 
     def destroy_children(self, widget):
         """递归销毁所有子组件"""
@@ -586,6 +597,9 @@ class SettingsWindow:
             
             # 应用debug模式设置
             self.main_app.config_handler.debug_mode = self.debug_var.get()
+            
+            # 应用自动更新检查设置
+            self.main_app.config_handler.auto_update_check_enabled = self.auto_update_check_var.get()
             
             # 应用自动补全结束时间设置
             self.main_app.config_handler.auto_complete_end_time = self.auto_complete_var.get()

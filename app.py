@@ -4,12 +4,12 @@ import os
 import sys
 import json
 import threading
+import importlib
 from datetime import datetime, date
 from constants import SCHEDULE_FILE, WEEKDAYS
 from config_handler import ConfigHandler
 from logger import logger
 from main_menu import MainMenu
-from updater import Updater
 
 class CourseScheduler:
     """课程表主应用类"""
@@ -632,14 +632,28 @@ class CourseScheduler:
         self.tools_window.show()
 
     def start_background_update_check(self):
-        """如果启用了自动更新，则加载模块并启动更新检查。"""
+        """如果启用了自动更新，则在后台线程中加载模块并启动更新检查。"""
         if self.config_handler.auto_update_check_enabled:
             logger.log_info("自动更新已启用，准备在后台加载Updater模块。")
-            from updater import Updater
-            self.updater = Updater(self.root)
-            threading.Thread(
-                target=lambda: self.updater.run_update_flow(silent=True),
-                daemon=True
-            ).start()
+            # 在后台线程中执行加载和检查
+            threading.Thread(target=self._load_updater_and_check, daemon=True).start()
         else:
             logger.log_info("自动更新已禁用。")
+
+    def _load_updater_and_check(self):
+        """在后台线程中加载Updater模块并执行检查。"""
+        try:
+            # 动态导入Updater模块
+            updater_module = importlib.import_module("updater")
+            Updater = getattr(updater_module, "Updater")
+            
+            # 在主线程中创建Updater实例，因为它需要访问Tkinter root窗口
+            self.root.after(0, self._create_updater_instance, Updater)
+        except Exception as e:
+            logger.log_error(f"后台加载Updater失败: {e}")
+
+    def _create_updater_instance(self, Updater):
+        """在主线程中创建Updater实例并启动检查。"""
+        if self.updater is None:
+            self.updater = Updater(self.root)
+            self.updater.start_background_check()
