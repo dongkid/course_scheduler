@@ -37,6 +37,7 @@ if __name__ == "__main__":
     elif args.open_menu:
         startup_action = 'open_menu'
     app = CourseScheduler(startup_action=startup_action)
+    
     # 清理可能存在的临时重启资源
     RestartManager.cleanup_restart_manager_resources()
     try:

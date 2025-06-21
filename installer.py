@@ -7,6 +7,7 @@ import logging
 import subprocess
 #import atexit
 from logger import logger
+import threading
 
 def is_compiled():
     """判断是否已打包为exe"""
@@ -321,3 +322,4 @@ exit
         logger.log_error(f"安装失败: {str(e)}")
         messagebox.showerror("安装错误", f"安装过程中发生错误: {str(e)}")
         sys.exit(1)
+

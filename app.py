@@ -3,11 +3,13 @@ import tkinter as tk
 import os
 import sys
 import json
+import threading
 from datetime import datetime, date
 from constants import SCHEDULE_FILE, WEEKDAYS
 from config_handler import ConfigHandler
 from logger import logger
 from main_menu import MainMenu
+from updater import Updater
 
 class CourseScheduler:
     """课程表主应用类"""
@@ -17,6 +19,7 @@ class CourseScheduler:
             startup_action: 启动时要执行的动作
         """
         self.startup_action = startup_action
+        self.updater = None # 初始化为None
         self.last_second = -1  # 记录上次更新的秒数
         # 预计算并缓存icon路径
         base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
@@ -63,6 +66,10 @@ class CourseScheduler:
         except Exception as e:
             logger.log_error(e)
             raise
+
+        # 在app完全初始化后，通过after调用启动后台更新检查，确保不阻塞UI
+        self.root.after(200, self.start_background_update_check)
+
 
     def _create_root_window(self) -> tk.Tk:
         """创建并配置主窗口"""
@@ -603,7 +610,7 @@ class CourseScheduler:
     def open_about(self):
         from about_window import AboutWindow
         if self.about_window is None or not self.about_window.window.winfo_exists():
-            self.about_window = AboutWindow(self.root)
+            self.about_window = AboutWindow(self) # 传递整个app实例
         else:
             self.about_window.window.lift()
             
@@ -623,3 +630,16 @@ class CourseScheduler:
         if not hasattr(self, 'tools_window') or not self.tools_window.window.winfo_exists():
             self.tools_window = ToolsWindow(self.root, self.config_handler)
         self.tools_window.show()
+
+    def start_background_update_check(self):
+        """如果启用了自动更新，则加载模块并启动更新检查。"""
+        if self.config_handler.auto_update_check_enabled:
+            logger.log_info("自动更新已启用，准备在后台加载Updater模块。")
+            from updater import Updater
+            self.updater = Updater(self.root)
+            threading.Thread(
+                target=lambda: self.updater.run_update_flow(silent=True),
+                daemon=True
+            ).start()
+        else:
+            logger.log_info("自动更新已禁用。")

@@ -7,6 +7,7 @@ from tkinter import PhotoImage
 from constants import APP_NAME, VERSION, PROJECT_URL
 import threading
 from tkinter import messagebox
+from updater import Updater
 
 # 配置ttk样式
 def configure_styles():
@@ -22,7 +23,8 @@ def configure_styles():
 class AboutWindow:
     def __init__(self, parent):
         """初始化关于窗口"""
-        self.parent = parent
+        self.app = parent  # parent 现在是 app 实例
+        self.parent = self.app.root
         self.window = self._create_window()
         self._initialize_ui()
 
@@ -125,25 +127,12 @@ class AboutWindow:
 
     def _perform_update_check(self):
         """执行实际的更新检查"""
-        import update_checker  # 延迟导入
-        try:
-            latest_version, release_url = update_checker.UpdateChecker.check_for_updates()
-        except Exception as e:
-            latest_version = None
-            release_url = None
-            print(f"更新检查失败: {e}")
-        self.window.after(0, lambda: self._handle_update_result(latest_version, release_url))
-
-    def _handle_update_result(self, latest_version, release_url):
-        """处理更新检查结果"""
-        self.check_update_btn.config(state=tk.NORMAL, text="检查更新")
-        if latest_version:
-            if messagebox.askyesno("发现新版本", f"发现新版本 {latest_version}，是否立即前往下载？"):
-                if sys.platform == 'win32':
-                    subprocess.Popen(['start', release_url], shell=True)
-                elif sys.platform == 'darwin':
-                    subprocess.Popen(['open', release_url])
-                else:
-                    subprocess.Popen(['xdg-open', release_url])
-        else:
-            messagebox.showinfo("检查更新", "当前已是最新版本")
+        # 如果自动更新被禁用，updater可能不存在，需要即时创建
+        if not self.app.updater:
+            from updater import Updater
+            self.app.updater = Updater(self.app.root)
+            
+        # 使用 app 中唯一的 updater 实例
+        self.app.updater.run_update_flow()
+        # 检查完成后，恢复按钮状态
+        self.window.after(0, lambda: self.check_update_btn.config(state=tk.NORMAL, text="检查更新"))
