@@ -28,7 +28,8 @@ class ConfigHandler:
         self.transparent_background = False
         self.fullscreen_subtitle = "祝考生考试顺利"
         self.debug_mode = False
-        self.auto_update_check_enabled = True  # 新增：自动更新检查
+        self.auto_update_check_enabled = False  # 新增：自动更新检查
+        self.log_retention_days = 7  # 新增：日志保留天数
         self.geometry = None
 
     def check_registry_auto_start(self):
@@ -82,7 +83,7 @@ class ConfigHandler:
                 self.transparent_background = self.config.get("transparent_background", False)
                 self.fullscreen_subtitle = self.config.get("fullscreen_subtitle", "祝考生考试顺利")
                 self.debug_mode = self.config.get("debug_mode", False)
-                self.auto_update_check_enabled = self.config.get("auto_update_check_enabled", True)
+                self.auto_update_check_enabled = self.config.get("auto_update_check_enabled", False)
                 self.schedule_rotation_enabled = self.config.get("schedule_rotation_enabled", False)
                 self.rotation_schedule1 = self.config.get("rotation_schedule1", "")
                 self.rotation_schedule2 = self.config.get("rotation_schedule2", "")
@@ -110,7 +111,8 @@ class ConfigHandler:
         self.fullscreen_subtitle = self.config.get("fullscreen_subtitle", "祝考生考试顺利")
         # 优先读取debug_mode，兼容旧配置debug_enabled
         self.debug_mode = self.config.get("debug_mode", self.config.get("debug_enabled", False))
-        self.auto_update_check_enabled = self.config.get("auto_update_check_enabled", True)
+        self.auto_update_check_enabled = self.config.get("auto_update_check_enabled", False)
+        self.log_retention_days = self.config.get("log_retention_days", 7)
         
         # 新增轮换配置
         self.schedule_rotation_enabled = self.config.get("schedule_rotation_enabled", False)
@@ -195,7 +197,8 @@ class ConfigHandler:
             "rotation_schedule1": self.rotation_schedule1,
             "rotation_schedule2": self.rotation_schedule2,
             "rotation_start_date": self.rotation_start_date.strftime("%Y-%m-%d"),
-            "last_weather_location": self.last_weather_location
+            "last_weather_location": self.last_weather_location,
+            "log_retention_days": self.log_retention_days
         }
         
         try:

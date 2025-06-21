@@ -462,6 +462,15 @@ class SettingsWindow:
             style="White.TCheckbutton")
         self.auto_update_check.pack(side=tk.LEFT, padx=5)
 
+        # 日志设置
+        log_frame = ttk.LabelFrame(other_frame, text="日志设置", style="TFrame")
+        log_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        ttk.Label(log_frame, text="日志保留天数:").grid(row=0, column=0, padx=5, pady=5)
+        self.log_retention_days_entry = ttk.Entry(log_frame, width=5)
+        self.log_retention_days_entry.grid(row=0, column=1, padx=5, pady=5)
+        self.log_retention_days_entry.insert(0, str(self.main_app.config_handler.log_retention_days))
+
 
     def destroy_children(self, widget):
         """递归销毁所有子组件"""
@@ -647,6 +656,16 @@ class SettingsWindow:
             self.main_app.config_handler.schedule_rotation_enabled = self.rotation_var.get()
             self.main_app.config_handler.rotation_schedule1 = self.schedule1_var.get()
             self.main_app.config_handler.rotation_schedule2 = self.schedule2_var.get()
+            
+            # 应用日志保留天数设置
+            try:
+                log_retention_days = int(self.log_retention_days_entry.get())
+                if log_retention_days <= 0:
+                    raise ValueError
+                self.main_app.config_handler.log_retention_days = log_retention_days
+            except ValueError:
+                messagebox.showerror("错误", "请输入有效的日志保留天数（正整数）")
+                return
             
             self.main_app.config_handler.save_config()
             # 更新字体设置

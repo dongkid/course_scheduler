@@ -29,21 +29,33 @@ class AppLogger:
             self.log_dir = Path(tempfile.gettempdir()) / "CourseScheduler_logs"
             self.log_dir.mkdir(exist_ok=True)
         
-        # 清理空日志文件
-        self._clean_empty_logs()
+        # 清理日志文件
+        self._clean_logs()
         
         self._setup_logger()
 
-    def _clean_empty_logs(self):
-        """异步清理空日志文件"""
+    def _clean_logs(self):
+        """异步清理过期和空的日志文件"""
+        from config_handler import ConfigHandler
+        config = ConfigHandler()
+        
         def cleanup_task():
             try:
+                retention_days = config.log_retention_days
+                now = datetime.now()
+                
                 for log_file in self.log_dir.glob("*.log"):
                     if log_file.stat().st_size == 0:
                         log_file.unlink()
                         self.logger.debug(f"Deleted empty log file: {log_file}")
+                        continue
+
+                    file_mod_time = datetime.fromtimestamp(log_file.stat().st_mtime)
+                    if (now - file_mod_time).days > retention_days:
+                        log_file.unlink()
+                        self.logger.debug(f"Deleted expired log file: {log_file}")
             except Exception as e:
-                self.logger.error(f"Failed to clean empty logs: {str(e)}")
+                self.logger.error(f"Failed to clean logs: {str(e)}")
         
         # 提交异步清理任务
         self.executor.submit(cleanup_task)
