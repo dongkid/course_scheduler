@@ -13,6 +13,11 @@ except ImportError:
 from constants import DEFAULT_GEOMETRY, CONFIG_FILE, RESOLUTION_PRESETS
 from logger import logger
 
+try:
+    from win10toast import ToastNotifier
+except ImportError:
+    ToastNotifier = None
+
 # 在子进程中运行分辨率读取函数
 def get_screen_resolution_worker(queue):
     """获取主显示器分辨率并放入队列"""
@@ -129,18 +134,40 @@ def check_and_generate_files():
         logger.log_info(f"Setting initial geometry to: {optimal_geometry} (match type: {match_type})")
 
         if match_type == "exact":
-            messagebox.showinfo(
-                "布局提示",
-                "首次启动，已为您自动匹配预设的窗口布局。\n"
-                "如果布局不符合您的习惯，请在“设置”中进行调整。"
-            )
+            if ToastNotifier:
+                toaster = ToastNotifier()
+                toaster.show_toast(
+                    "布局提示",
+                    "首次启动，已为您自动匹配预设的窗口布局。\n如果布局不符合您的习惯，请在“设置”中进行调整。",
+                    icon_path="res/icon.ico",
+                    duration=10,
+                    threaded=True
+                )
+            else:
+                # Fallback to original messagebox if win10toast is not available
+                messagebox.showinfo(
+                    "布局提示",
+                    "首次启动，已为您自动匹配预设的窗口布局。\n"
+                    "如果布局不符合您的习惯，请在“设置”中进行调整。"
+                )
         else:  # 'fallback' or 'default'
-            messagebox.showwarning(
-                "布局警告",
-                "首次启动，未能找到完全匹配您屏幕的预设布局。\n"
-                "当前使用的是一个近似或默认的方案，可能不准确。\n"
-                "请务必在“设置”中根据您的偏好进行调整！"
-            )
+            if ToastNotifier:
+                toaster = ToastNotifier()
+                toaster.show_toast(
+                    "布局警告",
+                    "首次启动，未能找到完全匹配您屏幕的预设布局。\n当前使用的是一个近似或默认的方案，可能不准确。\n请务必在“设置”中根据您的偏好进行调整！",
+                    icon_path="res/icon.ico",
+                    duration=10,
+                    threaded=True
+                )
+            else:
+                # Fallback to original messagebox
+                messagebox.showwarning(
+                    "布局警告",
+                    "首次启动，未能找到完全匹配您屏幕的预设布局。\n"
+                    "当前使用的是一个近似或默认的方案，可能不准确。\n"
+                    "请务必在“设置”中根据您的偏好进行调整！"
+                )
 
         default_config = {
             "geometry": optimal_geometry,
