@@ -1,4 +1,21 @@
 # 常量定义
+DEFAULT_GEOMETRY = "180x800+1497+117"
+CONFIG_FILE = "config.json"
+SCHEDULE_FILE = "schedule.json"
+ASPECT_RATIO = 0.5
+WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"]
+
+# GitHub相关配置
+GITHUB_DOMAIN = "github.com/"
+VERSION_PATTERN = r"^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$"
+
+# 程序信息
+APP_NAME = "桌面课程表 - Course Scheduler"
+AUTHOR = "dong"
+VERSION = "0.1.16-preview"
+CONFIG_VERSION = "1"
+PROJECT_URL = "https://github.com/dongkid/course_scheduler"
+
 # 分辨率预设
 # 格式: (屏幕宽度, 屏幕高度): {缩放比例: "窗口宽度x窗口高度+x偏移+y偏移"}
 RESOLUTION_PRESETS = {
@@ -33,19 +50,3 @@ STRING_TO_RESOLUTION_KEY = {
     "4k": (3840, 2160),
 }
 
-DEFAULT_GEOMETRY = "180x800+1497+117"
-CONFIG_FILE = "config.json"
-SCHEDULE_FILE = "schedule.json"
-ASPECT_RATIO = 0.5
-WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"]
-
-# GitHub相关配置
-GITHUB_DOMAIN = "github.com/"
-VERSION_PATTERN = r"^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$"
-
-# 程序信息
-APP_NAME = "桌面课程表 - Course Scheduler"
-AUTHOR = "dong"
-VERSION = "0.1.15-release"
-CONFIG_VERSION = "1"
-PROJECT_URL = "https://github.com/dongkid/course_scheduler"

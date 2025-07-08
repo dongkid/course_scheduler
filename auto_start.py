@@ -151,23 +151,12 @@ def check_and_generate_files():
                     "如果布局不符合您的习惯，请在“设置”中进行调整。"
                 )
         else:  # 'fallback' or 'default'
-            if ToastNotifier:
-                toaster = ToastNotifier()
-                toaster.show_toast(
-                    "布局警告",
-                    "首次启动，未能找到完全匹配您屏幕的预设布局。\n当前使用的是一个近似或默认的方案，可能不准确。\n请务必在“设置”中根据您的偏好进行调整！",
-                    icon_path="res/icon.ico",
-                    duration=10,
-                    threaded=True
-                )
-            else:
-                # Fallback to original messagebox
-                messagebox.showwarning(
-                    "布局警告",
-                    "首次启动，未能找到完全匹配您屏幕的预设布局。\n"
-                    "当前使用的是一个近似或默认的方案，可能不准确。\n"
-                    "请务必在“设置”中根据您的偏好进行调整！"
-                )
+            messagebox.showwarning(
+                "布局警告",
+                "首次启动，未能找到完全匹配您屏幕的预设布局。\n"
+                "当前使用的是一个近似或默认的方案，可能不准确。\n"
+                "请务必在“设置”中根据您的偏好进行调整！"
+            )
 
         default_config = {
             "geometry": optimal_geometry,
