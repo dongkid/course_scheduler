@@ -13,10 +13,11 @@ from main_menu import MainMenu
 
 class CourseScheduler:
     """课程表主应用类"""
-    def __init__(self, startup_action=None):
+    def __init__(self, startup_action=None, geometry_override=None):
         """初始化课程表应用
         Args:
             startup_action: 启动时要执行的动作
+            geometry_override: 覆盖窗口几何设置
         """
         self.startup_action = startup_action
         self.updater = None # 初始化为None
@@ -32,13 +33,19 @@ class CourseScheduler:
             self.config_handler = ConfigHandler()
             logger.log_debug("ConfigHandler initialized")
             self.config_handler.initialize_config()
-            logger.log_debug("Configuration initialized")
+            
+            # 现在使用加载的配置来初始化日志记录器
+            logger.setup(self.config_handler)
+            logger.log_debug("Configuration and logger initialized")
             
             # 创建主窗口并应用配置
             self.root = self._create_root_window()
             logger.log_debug("Main window created")
             # 应用窗口尺寸并强制更新布局
-            self.root.geometry(self.config_handler.geometry)
+            if geometry_override:
+                self.root.geometry(geometry_override)
+            else:
+                self.root.geometry(self.config_handler.geometry)
             self.root.update_idletasks()  # 立即应用窗口布局
             
             # 初始化其他成员变量
@@ -637,8 +644,8 @@ class CourseScheduler:
             logger.log_info("自动更新已启用，准备在后台加载Updater模块。")
             # 在后台线程中执行加载和检查
             threading.Thread(target=self._load_updater_and_check, daemon=True).start()
-        else:
-            logger.log_info("自动更新已禁用。")
+        # else:
+        #     logger.log_warning("自动更新已禁用。")
 
     def _load_updater_and_check(self):
         """在后台线程中加载Updater模块并执行检查。"""

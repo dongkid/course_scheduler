@@ -8,78 +8,71 @@ from constants import CONFIG_FILE
 from concurrent.futures import ThreadPoolExecutor
 
 class AppLogger:
+    _instance = None
+    _lock = threading.Lock()
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            with cls._lock:
+                if not cls._instance:
+                    cls._instance = super().__new__(cls)
+        return cls._instance
+
     def __init__(self):
-        # 初始化线程池用于异步任务
-        self.log_dir = Path("logs")
-        self._env_logged = False
-        # 创建异步日志队列和监听器
-        self.log_queue = Queue(-1)  # 无限容量队列
-        self.queue_listener = None
+        # 防止重复初始化
+        if hasattr(self, '_initialized') and self._initialized:
+            return
+        with self._lock:
+            if hasattr(self, '_initialized') and self._initialized:
+                return
+            
+            self.logger = None
+            self._env_logged = False
+            self.log_queue = Queue(-1)
+            self.queue_listener = None
+            self.executor = None
+            self._initialized = True
+
+    def setup(self, config=None):
+        """
+        显式初始化日志记录器。
+        这次初始化是幂等的，可以安全地多次调用。
+        """
+        if self.logger is not None:
+            return  # 已经初始化
+
+        # 从配置或默认值中获取设置
+        debug_mode = getattr(config, 'debug_mode', False)
+        log_retention_days = getattr(config, 'log_retention_days', 7)
+
+        # 初始化线程池
         self.executor = ThreadPoolExecutor(max_workers=2)
+
+        # 设置日志目录
+        self.log_dir = Path("logs")
         try:
-            # 尝试创建日志目录
             self.log_dir.mkdir(exist_ok=True)
         except PermissionError:
-            # 如果权限不足，尝试在当前用户目录下创建日志目录
             self.log_dir = Path.home() / "CourseScheduler_logs"
             self.log_dir.mkdir(exist_ok=True)
-        except Exception as e:
-            # 如果其他错误，使用临时目录
+        except Exception:
             import tempfile
             self.log_dir = Path(tempfile.gettempdir()) / "CourseScheduler_logs"
             self.log_dir.mkdir(exist_ok=True)
-        
-        # 清理日志文件
-        self._clean_logs()
-        
-        self._setup_logger()
 
-    def _clean_logs(self):
-        """异步清理过期和空的日志文件"""
-        from config_handler import ConfigHandler
-        config = ConfigHandler()
-        
-        def cleanup_task():
-            try:
-                retention_days = config.log_retention_days
-                now = datetime.now()
-                
-                for log_file in self.log_dir.glob("*.log"):
-                    if log_file.stat().st_size == 0:
-                        log_file.unlink()
-                        self.logger.debug(f"Deleted empty log file: {log_file}")
-                        continue
+        self._clean_logs(log_retention_days)
 
-                    file_mod_time = datetime.fromtimestamp(log_file.stat().st_mtime)
-                    if (now - file_mod_time).days > retention_days:
-                        log_file.unlink()
-                        self.logger.debug(f"Deleted expired log file: {log_file}")
-            except Exception as e:
-                self.logger.error(f"Failed to clean logs: {str(e)}")
-        
-        # 提交异步清理任务
-        self.executor.submit(cleanup_task)
-
-    def _setup_logger(self):
-        from config_handler import ConfigHandler
-        config = ConfigHandler()
-        config.initialize_config()
-        
-        # 确保日志目录存在
-        self.log_dir.mkdir(exist_ok=True)
-        
-        # 创建日志记录器
+        # 创建和配置日志记录器
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
-        
-        # 创建实际处理器
+
         log_file = self.log_dir / f"app_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-        file_handler = logging.FileHandler(log_file)
-        file_handler.setLevel(logging.DEBUG if config.debug_mode else logging.ERROR)
-        
+        file_handler = logging.FileHandler(log_file, encoding='utf-8')
+        file_handler.setLevel(logging.DEBUG if debug_mode else logging.INFO)
+
         console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.DEBUG if config.debug_mode else logging.ERROR)
-        
+        console_handler.setLevel(logging.DEBUG if debug_mode else logging.INFO)
+
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         file_handler.setFormatter(formatter)
         console_handler.setFormatter(formatter)
@@ -90,72 +83,93 @@ class AppLogger:
         )
         self.queue_listener.start()
 
-        # 添加队列处理器
         self.logger.addHandler(QueueHandler(self.log_queue))
         
-        # 记录日志系统初始化信息
-        self.logger.debug("Logger initialized")
-        self.logger.debug(f"Debug mode: {config.debug_mode}")
-        self.logger.debug(f"Log directory: {self.log_dir}")
+        self.log_debug("Logger initialized")
+        self.log_debug(f"Log level set to {'DEBUG' if debug_mode else 'INFO'}.")
+        self.log_debug(f"Log directory: {self.log_dir}")
+
+        # 如果在调试模式下，记录详细的配置信息
+        if debug_mode and config:
+            self.log_debug("Configuration details:")
+            self.log_debug(f"  Config file: {CONFIG_FILE}")
+            self.log_debug(f"  Countdown: {config.countdown_name} on {config.countdown_date.strftime('%Y-%m-%d')}")
+            self.log_debug(f"  Course settings: duration={config.course_duration}min, break={config.break_duration}min")
+            self.log_debug(f"  Auto settings: start={config.auto_start}, complete={config.auto_complete_end_time}, next={config.auto_calculate_next_course}")
+            self.log_debug(f"  Display settings: font_size={config.font_size}, time_size={config.time_display_size}")
+            self.log_debug(f"  Font color: {config.font_color}")
+            self.log_debug(f"  Padding: horizontal={config.horizontal_padding}, vertical={config.vertical_padding}")
+            self.log_debug(f"  Countdown size: {config.countdown_size}")
+            self.log_debug(f"  Schedule size: {config.schedule_size}")
+            self.log_debug(f"  Transparent background: {config.transparent_background}")
+            self.log_debug(f"  Fullscreen subtitle: {config.fullscreen_subtitle}")
+            self.log_debug(f"  Auto update check: {config.auto_update_check_enabled}")
+            self.log_debug(f"  Log retention days: {config.log_retention_days}")
+
+    def _clean_logs(self, retention_days):
+        """异步清理过期和空的日志文件"""
+        def cleanup_task():
+            try:
+                now = datetime.now()
+                cleaned_files = []
+                for log_file in self.log_dir.glob("*.log"):
+                    is_empty = log_file.stat().st_size == 0
+                    if is_empty:
+                        log_file.unlink()
+                        cleaned_files.append(f"Deleted empty log file: {log_file.name}")
+                        continue
+
+                    file_mod_time = datetime.fromtimestamp(log_file.stat().st_mtime)
+                    if (now - file_mod_time).days > retention_days:
+                        log_file.unlink()
+                        cleaned_files.append(f"Deleted expired log file: {log_file.name}")
+                
+                if cleaned_files:
+                    self.log_debug("Log cleanup task completed.")
+                    for msg in cleaned_files:
+                        self.log_debug(f"  - {msg}")
+
+            except Exception as e:
+                self.log_error(f"Failed to clean logs: {str(e)}")
         
-        # 记录配置信息
-        if config.debug_mode:
-            self.logger.debug("Configuration details:")
-            self.logger.debug(f"Config file: {CONFIG_FILE}")
-            self.logger.debug(f"Countdown: {config.countdown_name} on {config.countdown_date.strftime('%Y-%m-%d')}")
-            self.logger.debug(f"Course settings: duration={config.course_duration}min, break={config.break_duration}min")
-            self.logger.debug(f"Auto settings: start={config.auto_start}, complete={config.auto_complete_end_time}, next={config.auto_calculate_next_course}")
-            self.logger.debug(f"Display settings: font_size={config.font_size}, time_size={config.time_display_size}")
-            self.logger.debug(f"Font color: {config.font_color}")
-            self.logger.debug(f"Padding: horizontal={config.horizontal_padding}, vertical={config.vertical_padding}")
-            self.logger.debug(f"Countdown size: {config.countdown_size}")
-            self.logger.debug(f"Schedule size: {config.schedule_size}")
-            self.logger.debug(f"Transparent background: {config.transparent_background}")
-            self.logger.debug(f"Fullscreen subtitle: {config.fullscreen_subtitle}")
+        # 提交异步清理任务
+        if self.executor:
+            self.executor.submit(cleanup_task)
 
     def log_error(self, error):
-        self.logger.error(f"Error occurred: {str(error)}", exc_info=True)
+        if self.logger:
+            self.logger.error(f"Error occurred: {str(error)}", exc_info=True)
 
     def log_warning(self, warning):
-        self.logger.warning(f"Warning: {str(warning)}")
+        if self.logger:
+            self.logger.warning(f"Warning: {str(warning)}")
 
     def log_info(self, info):
-        self.logger.info(f"Info: {str(info)}")
+        if self.logger:
+            self.logger.info(f"Info: {str(info)}")
 
     def shutdown(self):
-        """安全关闭日志系统"""
         if self.queue_listener:
-            # 异步停止监听器并关闭线程池
-            def stop_listener():
-                self.queue_listener.stop()
-                if hasattr(self, 'executor') and self.executor:
-                    self.executor.shutdown(wait=False)
-            threading.Thread(target=stop_listener, daemon=True).start()
+            self.queue_listener.stop()
+        if self.executor:
+            self.executor.shutdown(wait=True)
 
     def log_debug(self, debug):
-        # 分离环境信息记录
-        if not self._env_logged:
-            self._log_environment()
-        
-        # 直接记录调试信息
-        self.logger.debug(str(debug))
+        if self.logger:
+            if not self._env_logged:
+                self._log_environment()
+            self.logger.debug(str(debug))
 
     def _log_environment(self):
-        """记录环境信息（只执行一次）"""
-        import platform
-        import os
-        import sys
-        
+        import platform, os, sys
         env_info = [
             f"System: {platform.system()} {platform.release()}",
             f"Python: {sys.version}",
             f"Working Directory: {os.getcwd()}",
-            f"Environment Variables: {dict(os.environ)}"
         ]
-        
         for line in env_info:
             self.logger.debug(line)
-        
         self._env_logged = True
 
+# 全局单例
 logger = AppLogger()
