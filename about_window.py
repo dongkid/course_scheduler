@@ -48,7 +48,7 @@ class AboutWindow:
             from updater import Updater
             # 再次检查，以防在导入期间主线程已创建实例（处理竞态条件）
             if not hasattr(self.app, 'updater') or not self.app.updater:
-                self.app.updater = Updater(self.app.root)
+                self.app.updater = Updater(self.app.root, self.app.config_handler)
 
     def _update_font_size(self, event=None):
         """根据窗口宽度动态调整所有文本字体大小"""
@@ -132,6 +132,17 @@ class AboutWindow:
         )
         self.check_update_btn.pack(side=tk.RIGHT, padx=10)
 
+        # 检查预发布版选项
+        self.prerelease_var = tk.BooleanVar(value=self.app.config_handler.check_prerelease)
+        prerelease_check = ttk.Checkbutton(
+            update_frame,
+            text="检查预览版",
+            variable=self.prerelease_var,
+            command=self.toggle_prerelease_check,
+            style="AboutWindow.TCheckbutton"
+        )
+        prerelease_check.pack(side=tk.RIGHT, padx=(0, 10))
+
     def start_update_check(self):
         """启动异步更新检查"""
         self.check_update_btn.config(state=tk.DISABLED, text="检查中...")
@@ -142,9 +153,14 @@ class AboutWindow:
         # 如果自动更新被禁用，updater可能不存在，需要即时创建
         if not self.app.updater:
             from updater import Updater
-            self.app.updater = Updater(self.app.root)
+            self.app.updater = Updater(self.app.root, self.app.config_handler)
             
         # 使用 app 中唯一的 updater 实例
         self.app.updater.run_update_flow()
         # 检查完成后，恢复按钮状态
         self.window.after(0, lambda: self.check_update_btn.config(state=tk.NORMAL, text="检查更新"))
+
+    def toggle_prerelease_check(self):
+        """切换是否检查预发布版本的配置"""
+        self.app.config_handler.check_prerelease = self.prerelease_var.get()
+        self.app.config_handler.save_config()

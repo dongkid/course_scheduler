@@ -31,6 +31,7 @@ class ConfigHandler:
         self.auto_update_check_enabled = False  # 新增：自动更新检查
         self.log_retention_days = 7  # 新增：日志保留天数
         self.geometry = None
+        self.check_prerelease = False # 新增：是否检查预发布版本
 
     def check_registry_auto_start(self):
         """检查注册表中是否存在开机自启动项"""
@@ -110,6 +111,7 @@ class ConfigHandler:
         self.debug_mode = self.config.get("debug_mode", self.config.get("debug_enabled", False))
         self.auto_update_check_enabled = self.config.get("auto_update_check_enabled", False)
         self.log_retention_days = self.config.get("log_retention_days", 7)
+        self.check_prerelease = self.config.get("check_prerelease", False)
         
         # 新增轮换配置
         self.schedule_rotation_enabled = self.config.get("schedule_rotation_enabled", False)
@@ -197,6 +199,7 @@ class ConfigHandler:
             "last_weather_location": self.last_weather_location,
             "log_retention_days": self.log_retention_days
         }
+        config_data["check_prerelease"] = self.check_prerelease
         
         try:
             # 使用临时文件写入，避免写入过程中断导致文件损坏

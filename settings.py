@@ -383,10 +383,15 @@ class SettingsWindow:
             color = colorchooser.askcolor()[1]
             if color:
                 self.font_color = color
-                self.color_preview.config(bg=color)
+                text_color = self._get_contrasting_color(color)
+                self.color_preview.config(bg=color, fg=text_color)
         
         self.font_color = self.main_app.config_handler.font_color
-        self.color_preview = ttk.Label(font_frame, text="颜色", background=self.font_color, width=5)
+        initial_text_color = self._get_contrasting_color(self.font_color)
+        self.color_preview = tk.Label(font_frame, text="颜色",
+                                      background=self.font_color,
+                                      foreground=initial_text_color,
+                                      width=5)
         self.color_preview.grid(row=1, column=0, padx=5, pady=5)
         ttk.Button(font_frame, text="选择颜色", command=choose_color, style="TButton").grid(row=1, column=1, padx=5, pady=5)
         
@@ -471,6 +476,18 @@ class SettingsWindow:
         self.log_retention_days_entry.grid(row=0, column=1, padx=5, pady=5)
         self.log_retention_days_entry.insert(0, str(self.main_app.config_handler.log_retention_days))
 
+
+    def _get_contrasting_color(self, hex_color):
+        """Calculates contrasting text color (black or white) for a given hex background color."""
+        try:
+            r, g, b = self.window.winfo_rgb(hex_color)
+            # Brightness calculation using a common formula (YIQ)
+            # If brightness is over half of the max value (65535), use black text.
+            brightness = ((r * 299) + (g * 587) + (b * 114)) / 1000
+            return 'black' if brightness > 32767 else 'white'
+        except tk.TclError:
+            # Fallback for invalid color names or during initialization issues
+            return 'black'
 
     def destroy_children(self, widget):
         """递归销毁所有子组件"""

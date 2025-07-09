@@ -22,12 +22,14 @@ DOWNLOAD_RETRY = 2 # Retries for a single chunk
 class Updater:
     """处理应用程序更新的类，包括检查、下载和安装。"""
 
-    def __init__(self, parent_window: tk.Tk):
+    def __init__(self, parent_window: tk.Tk, config_handler=None):
         """
         初始化Updater。
         :param parent_window: 父Tkinter窗口，用于显示对话框。
+        :param config_handler: 配置处理器实例
         """
         self.parent_window = parent_window
+        self.config_handler = config_handler
         self.progress_window: Optional[tk.Toplevel] = None
         self.progress_bar: Optional[ttk.Progressbar] = None
         self.progress_label: Optional[tk.Label] = None
@@ -82,24 +84,62 @@ class Updater:
     def check_for_updates(self) -> Optional[Dict[str, Any]]:
         """
         检查GitHub上是否有新版本。
+        根据配置决定是否检查预发布版本。
         :return: 如果有新版本，则返回包含版本信息的字典，否则返回None。
         """
+        logger.log_debug("开始检查更新...")
+        
+        # 从配置中获取是否检查预发布版
+        check_prerelease = self.config_handler.check_prerelease if self.config_handler else False
+        logger.log_debug(f"检查预发布版本: {'是' if check_prerelease else '否'}")
+
         try:
             repo = PROJECT_URL.split(GITHUB_DOMAIN)[-1].rstrip("/")
-            api_url = f"https://api.github.com/repos/{repo}/releases/latest"
-            response = requests.get(api_url, timeout=10)
-            response.raise_for_status()
             
-            release_data = response.json()
+            if check_prerelease:
+                # 检查所有版本
+                api_url = f"https://api.github.com/repos/{repo}/releases"
+                response = requests.get(api_url, timeout=10)
+                response.raise_for_status()
+                releases = response.json()
+                if not releases:
+                    logger.log_debug("没有找到任何发布。")
+                    return None
+
+                latest_release_data = None
+                highest_version = "0.0.0"
+                for release in releases:
+                    if release.get('draft', False):
+                        continue
+                    tag_name = release.get("tag_name", "").lstrip('v')
+                    if self._is_newer(tag_name, highest_version):
+                        highest_version = tag_name
+                        latest_release_data = release
+                
+                if not latest_release_data:
+                    logger.log_debug("在所有发布中未找到有效版本。")
+                    return None
+                
+                release_data = latest_release_data
+            else:
+                # 只检查最新的稳定版
+                api_url = f"https://api.github.com/repos/{repo}/releases/latest"
+                response = requests.get(api_url, timeout=10)
+                response.raise_for_status()
+                release_data = response.json()
+
             latest_version = release_data.get("tag_name", "").lstrip('v')
+            logger.log_debug(f"查询到最新版本: {latest_version}，当前版本: {VERSION}")
 
             if self._is_newer(latest_version, VERSION):
+                logger.log_debug(f"发现新版本: {latest_version}")
                 return {
                     "version": latest_version,
                     "url": release_data.get("html_url"),
                     "notes": release_data.get("body"),
                     "assets": release_data.get("assets", [])
                 }
+            logger.log_debug("当前已是最新版本。")
             return None
         except Exception as e:
             logger.log_error(f"更新检查失败: {str(e)}")
@@ -552,7 +592,7 @@ def main():
     """用于测试的临时入口点"""
     root = tk.Tk()
     root.withdraw()  # 隐藏主窗口
-    updater = Updater(root)
+    updater = Updater(root, config_handler=None) # 传递一个假的config_handler
     updater.run_update_flow()
     root.mainloop()
 
