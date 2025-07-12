@@ -57,6 +57,7 @@ class CourseScheduler:
             self.about_window = None
             self.main_menu = None
             self.was_iconic = False  # 初始化窗口状态跟踪属性
+            self.is_dialog_open = False # 防止对话框多开
             
             logger.log_debug("Initializing schedule")
             self._initialize_schedule()
@@ -623,13 +624,18 @@ class CourseScheduler:
             
     def _exit_with_confirmation(self):
         """带确认的退出函数"""
-        # self.root.quit()
-        from tkinter import messagebox
-        if self.config_handler.debug_mode:
-            self.root.quit()
-        else:
-            if messagebox.askyesno("确认", "确定要退出程序吗？"):
+        if self.is_dialog_open:
+            return
+        self.is_dialog_open = True
+        try:
+            from tkinter import messagebox
+            if self.config_handler.debug_mode:
                 self.root.quit()
+            else:
+                if messagebox.askyesno("确认", "确定要退出程序吗？"):
+                    self.root.quit()
+        finally:
+            self.is_dialog_open = False
 
     def _show_tools_window(self):
         """显示小工具窗口"""

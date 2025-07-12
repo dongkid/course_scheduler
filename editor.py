@@ -67,6 +67,7 @@ class EditorWindow:
             self.selected_rows = set()  # 存储选中行的ID
             self.previous_tab_index = 0
             self._is_programmatic_tab_change = False
+            self.is_dialog_open = False
 
             # 为临时开关创建BooleanVar
             self.auto_complete_var = tk.BooleanVar(value=self.main_app.config_handler.auto_complete_end_time)
@@ -174,35 +175,41 @@ class EditorWindow:
 
     def _rename_schedule(self):
         """重命名当前课表"""
-        old_name = self.schedule_var.get()
-        new_name = simpledialog.askstring("重命名课表", "请输入新名称:", initialvalue=old_name)
-        
-        if not new_name:
+        if self.is_dialog_open:
             return
-            
-        if new_name == old_name:
-            return
-            
-        if new_name in self.main_app.schedule["schedules"]:
-            messagebox.showerror("错误", "该名称已存在，请使用其他名称")
-            return
-            
+        self.is_dialog_open = True
         try:
-            # 重命名课表数据
-            self.main_app.schedule["last_modified"] = datetime.now().timestamp() if "last_modified" in self.main_app.schedule else datetime.now().timestamp()
-            self.main_app.schedule["schedules"][new_name] = self.main_app.schedule["schedules"].pop(old_name)
-            # 更新当前课表名称
-            self.current_schedule = new_name
-            self.main_app.schedule["current_schedule"] = new_name
-            # 更新时间记录
-            self.schedule_times[new_name] = self.schedule_times.pop(old_name)
-            # 更新选择框
-            self.schedule_combobox['values'] = list(self.main_app.schedule["schedules"].keys())
-            self.schedule_combobox.set(new_name)
-            messagebox.showinfo("成功", "课表已重命名")
-        except Exception as e:
-            logger.log_error(e)
-            messagebox.showerror("错误", f"重命名失败: {str(e)}")
+            old_name = self.schedule_var.get()
+            new_name = simpledialog.askstring("重命名课表", "请输入新名称:", initialvalue=old_name)
+            
+            if not new_name:
+                return
+                
+            if new_name == old_name:
+                return
+                
+            if new_name in self.main_app.schedule["schedules"]:
+                messagebox.showerror("错误", "该名称已存在，请使用其他名称")
+                return
+                
+            try:
+                # 重命名课表数据
+                self.main_app.schedule["last_modified"] = datetime.now().timestamp() if "last_modified" in self.main_app.schedule else datetime.now().timestamp()
+                self.main_app.schedule["schedules"][new_name] = self.main_app.schedule["schedules"].pop(old_name)
+                # 更新当前课表名称
+                self.current_schedule = new_name
+                self.main_app.schedule["current_schedule"] = new_name
+                # 更新时间记录
+                self.schedule_times[new_name] = self.schedule_times.pop(old_name)
+                # 更新选择框
+                self.schedule_combobox['values'] = list(self.main_app.schedule["schedules"].keys())
+                self.schedule_combobox.set(new_name)
+                messagebox.showinfo("成功", "课表已重命名")
+            except Exception as e:
+                logger.log_error(e)
+                messagebox.showerror("错误", f"重命名失败: {str(e)}")
+        finally:
+            self.is_dialog_open = False
 
     def _generate_copy_name(self, original_name):
         """生成唯一的副本名称"""
@@ -241,44 +248,56 @@ class EditorWindow:
 
     def _add_new_schedule(self):
         """添加新课表"""
-        new_name = simpledialog.askstring("新课表", "请输入新课表名称:")
-        if new_name and new_name not in self.main_app.schedule["schedules"]:
-            # 初始化新课表
-            self.main_app.schedule["schedules"][new_name] = {
-                "0": [], "1": [], "2": [], "3": [], 
-                "4": [], "5": [], "6": []
-            }
-            # 初始化新课表的时间记录
-            self.schedule_times[new_name] = []
-            # 更新选择框
-            self.schedule_combobox['values'] = list(self.main_app.schedule["schedules"].keys())
-            self.schedule_combobox.set(new_name)
-            # 更新当前课表
-            self.current_schedule = new_name
-            self.main_app.schedule["current_schedule"] = new_name
-            # 更新UI
-            self._update_ui_with_new_schedule()
-            # 标记为未修改
-            self._reset_modified_flag()
+        if self.is_dialog_open:
+            return
+        self.is_dialog_open = True
+        try:
+            new_name = simpledialog.askstring("新课表", "请输入新课表名称:")
+            if new_name and new_name not in self.main_app.schedule["schedules"]:
+                # 初始化新课表
+                self.main_app.schedule["schedules"][new_name] = {
+                    "0": [], "1": [], "2": [], "3": [],
+                    "4": [], "5": [], "6": []
+                }
+                # 初始化新课表的时间记录
+                self.schedule_times[new_name] = []
+                # 更新选择框
+                self.schedule_combobox['values'] = list(self.main_app.schedule["schedules"].keys())
+                self.schedule_combobox.set(new_name)
+                # 更新当前课表
+                self.current_schedule = new_name
+                self.main_app.schedule["current_schedule"] = new_name
+                # 更新UI
+                self._update_ui_with_new_schedule()
+                # 标记为未修改
+                self._reset_modified_flag()
+        finally:
+            self.is_dialog_open = False
 
     def _delete_schedule(self):
         """删除当前课表"""
-        self.main_app.schedule["last_modified"] = datetime.now().timestamp()
-        if len(self.main_app.schedule["schedules"]) <= 1:
-            messagebox.showwarning("警告", "至少需要保留一个课表")
+        if self.is_dialog_open:
             return
-            
-        current_schedule = self.schedule_var.get()
-        if messagebox.askyesno("删除课表", f"确定要删除课表'{current_schedule}'吗？"):
-            # 删除课表
-            del self.main_app.schedule["schedules"][current_schedule]
-            del self.schedule_times[current_schedule]
-            
-            # 切换到其他课表
-            new_schedule = next(iter(self.main_app.schedule["schedules"]))
-            self.schedule_combobox['values'] = list(self.main_app.schedule["schedules"].keys())
-            self.schedule_combobox.set(new_schedule)
-            self._on_schedule_change()
+        self.is_dialog_open = True
+        try:
+            self.main_app.schedule["last_modified"] = datetime.now().timestamp()
+            if len(self.main_app.schedule["schedules"]) <= 1:
+                messagebox.showwarning("警告", "至少需要保留一个课表")
+                return
+                
+            current_schedule = self.schedule_var.get()
+            if messagebox.askyesno("删除课表", f"确定要删除课表'{current_schedule}'吗？"):
+                # 删除课表
+                del self.main_app.schedule["schedules"][current_schedule]
+                del self.schedule_times[current_schedule]
+                
+                # 切换到其他课表
+                new_schedule = next(iter(self.main_app.schedule["schedules"]))
+                self.schedule_combobox['values'] = list(self.main_app.schedule["schedules"].keys())
+                self.schedule_combobox.set(new_schedule)
+                self._on_schedule_change()
+        finally:
+            self.is_dialog_open = False
 
     def _is_schedule_modified(self):
         """检查当前课表是否有未保存的修改"""
@@ -290,29 +309,35 @@ class EditorWindow:
 
     def _on_schedule_change(self, event=None):
         """切换课表时的处理"""
-        new_schedule = self.schedule_var.get()
-        if new_schedule == self.current_schedule:
+        if self.is_dialog_open:
             return
+        self.is_dialog_open = True
+        try:
+            new_schedule = self.schedule_var.get()
+            if new_schedule == self.current_schedule:
+                return
 
-        if self.modified:
-            response = messagebox.askyesno(
-                "保存更改",
-                "当前课表有未保存的修改，是否保存？",
-                parent=self.window
-            )
-            if response:  # Yes
-                self.save()
-            else:
-                # 不保存，直接切换，后续UI刷新将丢弃更改
-                self._reset_modified_flag()
+            if self.modified:
+                response = messagebox.askyesno(
+                    "保存更改",
+                    "当前课表有未保存的修改，是否保存？",
+                    parent=self.window
+                )
+                if response:  # Yes
+                    self.save(show_message=False)
+                else:
+                    # 不保存，直接切换，后续UI刷新将丢弃更改
+                    self._reset_modified_flag()
 
-        # 切换到新课表
-        self.current_schedule = new_schedule
-        self.main_app.schedule["current_schedule"] = new_schedule
-        if new_schedule not in self.schedule_times:
-            self.schedule_times[new_schedule] = []
-        self._update_ui_with_new_schedule()
-        self._reset_modified_flag()
+            # 切换到新课表
+            self.current_schedule = new_schedule
+            self.main_app.schedule["current_schedule"] = new_schedule
+            if new_schedule not in self.schedule_times:
+                self.schedule_times[new_schedule] = []
+            self._update_ui_with_new_schedule()
+            self._reset_modified_flag()
+        finally:
+            self.is_dialog_open = False
 
     def _update_ui_with_new_schedule(self):
         """用新课表数据更新现有UI"""
@@ -362,6 +387,11 @@ class EditorWindow:
 
     def _on_tab_changed(self, event):
         """处理标签页切换事件，增加未保存提示"""
+        if self.is_dialog_open:
+            self._is_programmatic_tab_change = True
+            self.notebook.select(self.previous_tab_index)
+            return
+
         if self._is_programmatic_tab_change:
             self._is_programmatic_tab_change = False
             return
@@ -371,11 +401,15 @@ class EditorWindow:
             return
 
         if self.modified:
-            response = messagebox.askyesnocancel(
-                "保存更改",
-                f"星期{WEEKDAYS[self.previous_tab_index]}的课程有未保存的修改。是否保存？",
-                parent=self.window
-            )
+            self.is_dialog_open = True
+            try:
+                response = messagebox.askyesnocancel(
+                    "保存更改",
+                    f"星期{WEEKDAYS[self.previous_tab_index]}的课程有未保存的修改。是否保存？",
+                    parent=self.window
+                )
+            finally:
+                self.is_dialog_open = False
 
             if response is True:  # Yes
                 self._save_day(self.previous_tab_index)
@@ -395,20 +429,26 @@ class EditorWindow:
             pass  # 窗口关闭时可能会引发此错误
     def _on_close(self):
         """处理窗口关闭事件"""
-        if self.modified:
-            response = messagebox.askyesnocancel(
-                "保存更改",
-                "当前课表有未保存的修改，是否保存？",
-                parent=self.window
-            )
-            if response is True:  # Yes
-                self.save(show_message=False)
+        if self.is_dialog_open:
+            return
+        self.is_dialog_open = True
+        try:
+            if self.modified:
+                response = messagebox.askyesnocancel(
+                    "保存更改",
+                    "当前课表有未保存的修改，是否保存？",
+                    parent=self.window
+                )
+                if response is True:  # Yes
+                    self.save(show_message=False)
+                    self.window.destroy()
+                elif response is False:  # No
+                    self.window.destroy()
+                # else: Cancel, do nothing
+            else:
                 self.window.destroy()
-            elif response is False:  # No
-                self.window.destroy()
-            # else: Cancel, do nothing
-        else:
-            self.window.destroy()
+        finally:
+            self.is_dialog_open = False
 
     def _create_batch_operations_bar(self) -> None:
         """创建批量操作按钮栏"""
@@ -499,7 +539,15 @@ class EditorWindow:
 
         # 如果当天没有课程且存在当前课表的上一次课程时间，提示是否导入
         if not courses and self.schedule_times[self.current_schedule]:
-            if messagebox.askyesno("导入课程时间", "是否导入当前课表的上一次课程时间？"):
+            if self.is_dialog_open:
+                return
+            self.is_dialog_open = True
+            try:
+                should_import = messagebox.askyesno("导入课程时间", "是否导入当前课表的上一次课程时间？")
+            finally:
+                self.is_dialog_open = False
+            
+            if should_import:
                 courses_to_display = [{
                     "start_time": ct["start_time"],
                     "end_time": ct["end_time"],
@@ -940,53 +988,68 @@ class EditorWindow:
 
     def _batch_delete(self):
         """批量删除选中课程"""
-        if not self.selected_rows:
-            messagebox.showwarning("提示", "请先选中要删除的课程")
+        if self.is_dialog_open:
             return
+        self.is_dialog_open = True
+        try:
+            if not self.selected_rows:
+                messagebox.showwarning("提示", "请先选中要删除的课程")
+                return
+                
+            if messagebox.askyesno("确认删除", f"确定要删除选中的{len(self.selected_rows)}个课程吗？"):
+                # 遍历所有day_frame查找选中行
+                for day_frame in self.day_frames:
+                    for row_frame in day_frame.winfo_children():
+                        if isinstance(row_frame, tk.Frame) and hasattr(row_frame, 'row_id'):
+                            if row_frame.row_id in self.selected_rows: # type: ignore
+                                row_frame.destroy()
+                                
+                self.selected_rows.clear()
+                self.modified = True
+        finally:
+            self.is_dialog_open = False
             
-        if messagebox.askyesno("确认删除", f"确定要删除选中的{len(self.selected_rows)}个课程吗？"):
-            # 遍历所有day_frame查找选中行
+    def _copy_selected(self):
+        """复制选中课程到剪贴板"""
+        if self.is_dialog_open:
+            return
+        self.is_dialog_open = True
+        try:
+            if not self.selected_rows:
+                messagebox.showwarning("提示", "请先选中要复制的课程")
+                return
+                
+            courses_data = []
+            # 收集选中课程数据
             for day_frame in self.day_frames:
                 for row_frame in day_frame.winfo_children():
                     if isinstance(row_frame, tk.Frame) and hasattr(row_frame, 'row_id'):
                         if row_frame.row_id in self.selected_rows: # type: ignore
-                            row_frame.destroy()
-                            
-            self.selected_rows.clear()
-            self.modified = True
+                            entries = [w for w in row_frame.winfo_children() if isinstance(w, tk.Entry)]
+                            if len(entries) >= 3:
+                                courses_data.append({
+                                    "start_time": entries[0].get(),
+                                    "end_time": entries[1].get(),
+                                    "name": entries[2].get()
+                                })
             
-    def _copy_selected(self):
-        """复制选中课程到剪贴板"""
-        if not self.selected_rows:
-            messagebox.showwarning("提示", "请先选中要复制的课程")
-            return
-            
-        courses_data = []
-        # 收集选中课程数据
-        for day_frame in self.day_frames:
-            for row_frame in day_frame.winfo_children():
-                if isinstance(row_frame, tk.Frame) and hasattr(row_frame, 'row_id'):
-                    if row_frame.row_id in self.selected_rows: # type: ignore
-                        entries = [w for w in row_frame.winfo_children() if isinstance(w, tk.Entry)]
-                        if len(entries) >= 3:
-                            courses_data.append({
-                                "start_time": entries[0].get(),
-                                "end_time": entries[1].get(),
-                                "name": entries[2].get()
-                            })
-        
-        if courses_data:
-            try:
-                import json
-                import pyperclip
-                pyperclip.copy(json.dumps(courses_data))
-                messagebox.showinfo("成功", f"已复制{len(courses_data)}个课程到剪贴板")
-            except Exception as e:
-                logger.log_error(e)
-                messagebox.showerror("错误", f"复制失败: {str(e)}")
+            if courses_data:
+                try:
+                    import json
+                    import pyperclip
+                    pyperclip.copy(json.dumps(courses_data))
+                    messagebox.showinfo("成功", f"已复制{len(courses_data)}个课程到剪贴板")
+                except Exception as e:
+                    logger.log_error(e)
+                    messagebox.showerror("错误", f"复制失败: {str(e)}")
+        finally:
+            self.is_dialog_open = False
     
     def _import_from_clipboard(self):
         """从剪贴板导入课程"""
+        if self.is_dialog_open:
+            return
+        self.is_dialog_open = True
         try:
             import json
             import pyperclip
@@ -1018,6 +1081,8 @@ class EditorWindow:
         except Exception as e:
             logger.log_error(e)
             messagebox.showerror("错误", f"导入失败: {str(e)}")
+        finally:
+            self.is_dialog_open = False
     
     def _update_suggestions(self, combobox):
         """根据用户输入更新课程名称建议"""
@@ -1102,6 +1167,9 @@ class EditorWindow:
 
     def save(self, show_message=True):
         """保存当前活动标签页的课程。"""
+        if self.is_dialog_open:
+            return
+        self.is_dialog_open = True
         try:
             selected_tab_index = self.notebook.index(self.notebook.select())
             self._save_day(selected_tab_index)
@@ -1117,6 +1185,8 @@ class EditorWindow:
         except Exception as e:
             logger.log_error(f"保存课表时发生错误: {e}")
             messagebox.showerror("错误", f"保存失败: {str(e)}")
+        finally:
+            self.is_dialog_open = False
 
     def _toggle_row_selection(self, row_id, row_frame):
         """切换行的选中状态"""

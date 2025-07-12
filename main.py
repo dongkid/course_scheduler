@@ -47,11 +47,40 @@ if __name__ == "__main__":
 
     geometry_override = None
     if args.geometry:
-        preset_key = STRING_TO_RESOLUTION_KEY.get(args.geometry.lower())
-        if preset_key:
-            geometry_override = RESOLUTION_PRESETS.get(preset_key)
+        parts = args.geometry.lower().split('-')
+        if len(parts) == 2:
+            res_str, dpi_str = parts
+            preset_key = STRING_TO_RESOLUTION_KEY.get(res_str)
+            if preset_key:
+                try:
+                    dpi = int(dpi_str)
+                    presets = RESOLUTION_PRESETS.get(preset_key)
+                    if isinstance(presets, dict):
+                        geometry_override = presets.get(dpi)
+                        if not geometry_override:
+                             logger.warning(f"在预设 '{res_str}' 中未找到DPI为 {dpi}% 的配置")
+                             # 回退到直接使用输入作为几何字符串
+                             geometry_override = args.geometry
+                    else:
+                        geometry_override = presets # 处理 "default" 等情况
+                except ValueError:
+                    logger.warning(f"无效的DPI值: '{dpi_str}'")
+                    geometry_override = args.geometry # DPI不是数字，直接使用
+            else:
+                # 分辨率字符串无效，直接使用
+                geometry_override = args.geometry
         else:
-            geometry_override = args.geometry
+            # 格式不匹配，尝试旧的逻辑或直接使用
+            preset_key = STRING_TO_RESOLUTION_KEY.get(args.geometry.lower())
+            if preset_key:
+                presets = RESOLUTION_PRESETS.get(preset_key)
+                if isinstance(presets, dict):
+                    # 默认使用100%
+                    geometry_override = presets.get(100, next(iter(presets.values())))
+                else:
+                    geometry_override = presets
+            else:
+                geometry_override = args.geometry
             
     app = CourseScheduler(startup_action=startup_action, geometry_override=geometry_override)
     
