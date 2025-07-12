@@ -7,6 +7,40 @@ from constants import DEFAULT_GEOMETRY, CONFIG_FILE, APP_NAME, AUTHOR, VERSION, 
 from about_window import AboutWindow
 from logger import logger
 
+
+class ScrollableFrame(ttk.Frame):
+    """可用于Notebook标签页的滚动框架"""
+    def __init__(self, container, *args, **kwargs):
+        super().__init__(container, *args, **kwargs)
+        self.canvas = tk.Canvas(self, bg="white", highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = ttk.Frame(self.canvas, style="TFrame")
+
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        )
+
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=scrollbar.set)
+
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # 绑定鼠标滚轮滚动
+        self.scrollable_frame.bind("<Enter>", self._on_enter)
+        self.scrollable_frame.bind("<Leave>", self._on_leave)
+
+    def _on_mousewheel(self, event):
+        self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    def _on_enter(self, event):
+        self.scrollable_frame.bind_all("<MouseWheel>", self._on_mousewheel)
+
+    def _on_leave(self, event):
+        self.scrollable_frame.unbind_all("<MouseWheel>")
+
+
 class SettingsWindow:
     def __init__(self, main_app):
         """初始化设置窗口"""
@@ -120,8 +154,9 @@ class SettingsWindow:
         
     def _create_layout_tab(self) -> None:
         """创建排版设置标签页"""
-        layout_frame = ttk.Frame(self.notebook, style="TFrame")
-        self.notebook.add(layout_frame, text="排版设置")
+        scrollable_tab = ScrollableFrame(self.notebook)
+        self.notebook.add(scrollable_tab, text="排版设置")
+        layout_frame = scrollable_tab.scrollable_frame
         
         def create_spinbox(frame, entry_var, row):
             """创建带加减按钮的输入控件"""
@@ -186,8 +221,9 @@ class SettingsWindow:
     
     def _create_window_tab(self) -> None:
         """创建窗口控制标签页"""
-        window_frame = ttk.Frame(self.notebook, style="TFrame")
-        self.notebook.add(window_frame, text="窗口控制")
+        scrollable_tab = ScrollableFrame(self.notebook)
+        self.notebook.add(scrollable_tab, text="窗口控制")
+        window_frame = scrollable_tab.scrollable_frame
         
         # 窗口位置控制
         pos_frame = ttk.LabelFrame(window_frame, text="窗口位置", style="TFrame")
@@ -266,8 +302,9 @@ class SettingsWindow:
 
     def _create_course_tab(self) -> None:
         """创建课程设置标签页"""
-        course_frame = ttk.Frame(self.notebook, style="TFrame")
-        self.notebook.add(course_frame, text="课程设置")
+        scrollable_tab = ScrollableFrame(self.notebook)
+        self.notebook.add(scrollable_tab, text="课程设置")
+        course_frame = scrollable_tab.scrollable_frame
         
         # 课程时长设置
         duration_frame = ttk.LabelFrame(course_frame, text="课程时长设置", style="TFrame")
@@ -299,6 +336,16 @@ class SettingsWindow:
         self.break_duration_entry = ttk.Entry(duration_frame, width=5)
         self.break_duration_entry.grid(row=3, column=1, padx=5, pady=5)
         self.break_duration_entry.insert(0, str(self.main_app.config_handler.break_duration))
+
+        # 预览设置
+        preview_frame = ttk.LabelFrame(course_frame, text="预览设置", style="TFrame")
+        preview_frame.pack(fill=tk.X, padx=10, pady=5)
+        self.auto_preview_tomorrow_var = tk.BooleanVar(value=self.main_app.config_handler.auto_preview_tomorrow_enabled)
+        self.auto_preview_tomorrow_check = ttk.Checkbutton(
+            preview_frame, text="结束后自动预览明天课表",
+            variable=self.auto_preview_tomorrow_var,
+            style="White.TCheckbutton")
+        self.auto_preview_tomorrow_check.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky=tk.W)
 
         # 课表轮换设置
         rotation_frame = ttk.LabelFrame(course_frame, text="课表轮换设置", style="TFrame")
@@ -365,8 +412,9 @@ class SettingsWindow:
 
     def _create_theme_tab(self) -> None:
         """创建主题设置标签页"""
-        theme_frame = ttk.Frame(self.notebook, style="TFrame")
-        self.notebook.add(theme_frame, text="主题设置")
+        scrollable_tab = ScrollableFrame(self.notebook)
+        self.notebook.add(scrollable_tab, text="主题设置")
+        theme_frame = scrollable_tab.scrollable_frame
         
         # 字体设置
         font_frame = ttk.LabelFrame(theme_frame, text="字体设置", style="TFrame")
@@ -408,8 +456,9 @@ class SettingsWindow:
 
     def _create_tools_tab(self) -> None:
         """创建小工具设置标签页"""
-        tools_frame = ttk.Frame(self.notebook, style="TFrame")
-        self.notebook.add(tools_frame, text="小工具")
+        scrollable_tab = ScrollableFrame(self.notebook)
+        self.notebook.add(scrollable_tab, text="小工具")
+        tools_frame = scrollable_tab.scrollable_frame
         
         # 添加全屏时间副标题设置
         fullscreen_frame = ttk.LabelFrame(tools_frame, text="全屏时间设置", style="TFrame")
@@ -431,8 +480,9 @@ class SettingsWindow:
 
     def _create_other_tab(self) -> None:
         """创建其他设置标签页"""
-        other_frame = ttk.Frame(self.notebook, style="TFrame")
-        self.notebook.add(other_frame, text="其他设置")
+        scrollable_tab = ScrollableFrame(self.notebook)
+        self.notebook.add(scrollable_tab, text="其他设置")
+        other_frame = scrollable_tab.scrollable_frame
         
         # 开机自启动设置
         auto_start_frame = ttk.LabelFrame(other_frame, text="开机自启动", style="TFrame")
@@ -673,6 +723,9 @@ class SettingsWindow:
             self.main_app.config_handler.schedule_rotation_enabled = self.rotation_var.get()
             self.main_app.config_handler.rotation_schedule1 = self.schedule1_var.get()
             self.main_app.config_handler.rotation_schedule2 = self.schedule2_var.get()
+
+            # 应用预览设置
+            self.main_app.config_handler.auto_preview_tomorrow_enabled = self.auto_preview_tomorrow_var.get()
             
             # 应用日志保留天数设置
             try:

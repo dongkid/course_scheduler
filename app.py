@@ -58,6 +58,14 @@ class CourseScheduler:
             self.main_menu = None
             self.was_iconic = False  # 初始化窗口状态跟踪属性
             self.is_dialog_open = False # 防止对话框多开
+            self.week_preview_window = None # 周课表预览窗口实例
+            self.tomorrow_preview_shown_for_today = False # 今天是否已显示过明日预览
+            
+            # --- 课表视图状态管理 ---
+            self.displayed_weekday = datetime.now().weekday()  # 当前显示的星期，0-6
+            self.view_reset_timer = None  # 视图自动重置计时器
+            self.swipe_start_x = 0  # 滑动起始x坐标
+            # -------------------------
             
             logger.log_debug("Initializing schedule")
             self._initialize_schedule()
@@ -108,9 +116,13 @@ class CourseScheduler:
         """清理所有资源"""
         try:
             # 关闭所有子窗口
-            for window in [self.editor_window, self.settings_window, self.about_window]:
-                if window and window.window.winfo_exists():
-                    window.window.destroy()
+            for window in [self.editor_window, self.settings_window, self.about_window, self.week_preview_window]:
+                if window and window.winfo_exists():
+                    # 兼容不同窗口对象的销毁方式
+                    if hasattr(window, 'window') and window.window.winfo_exists():
+                         window.window.destroy()
+                    else:
+                         window.destroy()
             
             # 取消所有定时器
             for timer_id in getattr(self, 'timer_ids', []):
@@ -225,16 +237,25 @@ class CourseScheduler:
 
     def _create_time_display(self) -> None:
         """创建时间显示区域"""
-        self.time_label = tk.Label(
-            self.root, 
+        self.time_date_label = tk.Label(
+            self.root,
             font=("微软雅黑", self.config_handler.time_display_size, "bold"),
             fg=self.config_handler.font_color,
             bg="#ecf0f1"
         )
-        self.time_label.pack(pady=self.config_handler.vertical_padding, fill=tk.X)
-        
+        self.time_date_label.pack(fill=tk.X)
+
+        self.weekday_label = tk.Label(
+            self.root,
+            font=("微软雅黑", self.config_handler.time_display_size, "bold"),
+            fg=self.config_handler.font_color,
+            bg="#ecf0f1"
+        )
+        self.weekday_label.pack(fill=tk.X)
+
         # 添加点击事件
-        self.time_label.bind("<Button-1>", self._on_time_label_click)
+        self.time_date_label.bind("<Button-1>", self._on_time_label_click)
+        self.weekday_label.bind("<Button-1>", self._on_time_label_click)
         
     def _on_time_label_click(self, event):
         """处理时间标签点击事件"""
@@ -332,6 +353,7 @@ class CourseScheduler:
         self.schedule_frame.pack(padx=self.config_handler.horizontal_padding, 
                                pady=self.config_handler.vertical_padding, 
                                fill=tk.BOTH, expand=True)
+        self._bind_schedule_events()
 
     def _start_update_loop(self) -> None:
         """启动界面更新循环"""
@@ -350,10 +372,25 @@ class CourseScheduler:
             
             # 只有秒数变化时才更新UI
             if current_second != self.last_second:
-                self._update_time_display(now)
                 self._update_countdown_display(now)
-                self._update_schedule_display(now)
+
+                # 根据当前是显示当天还是预览来更新时间/星期显示
+                if self.displayed_weekday == now.weekday():
+                    # 正常更新时间、秒数和星期
+                    self._update_time_display(now)
+                    # 课表内容也只在显示当天时才随时间更新状态
+                    self._update_schedule_display(now.weekday())
+                else:
+                    # 保持预览状态的显示（日期不变，星期为斜体）
+                    self.time_date_label.config(text=now.strftime("%Y-%m-%d"))
+                    self.weekday_label.config(
+                        text=f"星期{WEEKDAYS[self.displayed_weekday]}",
+                        font=("微软雅黑", self.config_handler.time_display_size, "bold italic")
+                    )
+
                 self.last_second = current_second
+
+            self._check_and_show_tomorrow_preview(now)
                 
             self._schedule_next_update()
             
@@ -369,11 +406,14 @@ class CourseScheduler:
 
     def _update_time_display(self, now: datetime) -> None:
         """更新时间显示"""
-        weekday = now.weekday()
-        self.time_label.config(
-            text=now.strftime("%Y-%m-%d\n%H:%M:%S\n") + 
-            f"星期{WEEKDAYS[weekday]}"
+        self.time_date_label.config(text=now.strftime("%Y-%m-%d\n%H:%M:%S"))
+        self.weekday_label.config(
+            text=f"星期{WEEKDAYS[now.weekday()]}",
+            font=("微软雅黑", self.config_handler.time_display_size, "bold")
         )
+        # 如果是新的一天，重置预览标志
+        if now.hour == 0 and now.minute == 0 and now.second == 0:
+            self.tomorrow_preview_shown_for_today = False
 
     def _update_countdown_display(self, now: datetime) -> None:
         """更新倒计时显示"""
@@ -384,13 +424,30 @@ class CourseScheduler:
         else:
             self.countdown_label2.config(text=str(delta), fg=self.config_handler.font_color)
 
-    def _update_schedule_display(self, now: datetime) -> None:
-        """更新课程表显示"""
+    def _update_schedule_display(self, weekday_to_show: int) -> None:
+        """更新课程表显示
+        Args:
+            weekday_to_show (int): 要显示的星期 (0-6).
+        """
         if not hasattr(self, 'course_labels'):
             self.course_labels = []
-            
-        weekday = str(now.weekday())
-        today_schedule = self.schedule["schedules"][self.schedule["current_schedule"]].get(weekday, [])
+        
+        now = datetime.now()
+        weekday_str = str(weekday_to_show)
+        
+        # 更新时间标签以反映当前显示的星期
+        displayed_day_str = f"星期{WEEKDAYS[weekday_to_show]}"
+        if weekday_to_show != now.weekday():
+            self.time_date_label.config(text=now.strftime("%Y-%m-%d"))
+            self.weekday_label.config(
+                text=displayed_day_str,
+                font=("微软雅黑", self.config_handler.time_display_size, "bold italic")
+            )
+        else:
+            # 仅在显示当天时才更新秒数
+            self._update_time_display(now)
+
+        schedule_for_day = self.schedule["schedules"][self.schedule["current_schedule"]].get(weekday_str, [])
         
         # 在更新前清除所有课程时间缓存
         self._course_time_cache.clear()
@@ -399,7 +456,7 @@ class CourseScheduler:
         self.course_labels = [label for label in self.course_labels if label.winfo_exists()]
         
         # 根据当前课表重新排列所有标签
-        for i, course in enumerate(today_schedule):
+        for i, course in enumerate(schedule_for_day):
             color = self._get_course_color(now, course)
             if i < len(self.course_labels):
                 # 强制更新标签颜色状态
@@ -411,7 +468,7 @@ class CourseScheduler:
                 self._create_new_label(course, color, row=i)
         
         # 移除多余的标签
-        self._remove_extra_labels(today_schedule)
+        self._remove_extra_labels(schedule_for_day)
 
     def _update_course_labels(self, now: datetime, schedule: List[Dict[str, str]]) -> None:
         """更新或创建课程标签"""
@@ -426,6 +483,10 @@ class CourseScheduler:
 
     def _get_course_color(self, now: datetime, course: Dict[str, str]) -> str:
         """根据课程时间获取显示颜色"""
+        # 如果显示的不是当天的课表，则所有课程都显示为“未开始”状态
+        if self.displayed_weekday != now.weekday():
+            return "red"
+
         # 使用课程名称+时间作为缓存键
         cache_key = f"{course['name']}_{course['start_time']}_{course['end_time']}"
         
@@ -474,10 +535,9 @@ class CourseScheduler:
     def _update_font_settings(self) -> None:
         """更新所有UI组件的字体设置"""
         # 更新时间显示
-        self.time_label.config(
-            font=("微软雅黑", self.config_handler.font_size, "bold"),
-            fg=self.config_handler.font_color
-        )
+        font_config = ("微软雅黑", self.config_handler.font_size, "bold")
+        self.time_date_label.config(font=font_config, fg=self.config_handler.font_color)
+        self.weekday_label.config(font=font_config, fg=self.config_handler.font_color)
         
         # 更新课程标签色块尺寸
         if hasattr(self, 'course_labels'):
@@ -543,6 +603,10 @@ class CourseScheduler:
             fg=self.config_handler.font_color,
             anchor='w'
         )
+        
+        # --- 事件绑定 ---
+        self._bind_events_to_widget(label)
+        self._bind_events_to_widget(course_frame)
         label.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
         # 根据字体大小计算色块尺寸
@@ -562,6 +626,110 @@ class CourseScheduler:
         self.course_labels.append(label)
         
         self.schedule_frame.grid_columnconfigure(0, weight=1)
+
+    def _bind_schedule_events(self):
+        """为课表框架及其所有子控件绑定事件"""
+        self._bind_events_to_widget(self.schedule_frame)
+        for child in self.schedule_frame.winfo_children():
+            self._bind_events_to_widget(child)
+            if isinstance(child, tk.Frame):
+                for grandchild in child.winfo_children():
+                    self._bind_events_to_widget(grandchild)
+
+    def _bind_events_to_widget(self, widget):
+        """辅助函数：为单个控件绑定所有需要的事件"""
+        widget.bind("<Button-1>", self._on_schedule_press)
+        widget.bind("<B1-Motion>", self._on_schedule_drag)
+        widget.bind("<Double-Button-1>", self._on_schedule_double_click)
+        widget.bind("<Triple-Button-1>", self._on_schedule_triple_click)
+
+    def _on_schedule_press(self, event):
+        """处理课表区域的鼠标按下事件"""
+        self.swipe_start_x = event.x
+        # 如果有重置计时器在运行，则取消它
+        if self.view_reset_timer:
+            self.root.after_cancel(self.view_reset_timer)
+            self.view_reset_timer = None
+
+    def _on_schedule_drag(self, event):
+        """处理课表区域的拖动事件（滑动）"""
+        if not self.swipe_start_x:
+            return
+        
+        delta_x = event.x - self.swipe_start_x
+        # 设置一个滑动阈值，防止过于敏感
+        if abs(delta_x) > 30:
+            direction = 'left' if delta_x < 0 else 'right'
+            self._handle_swipe(direction)
+            self.swipe_start_x = 0 # 重置起始位置，防止一次长滑动触发多次
+
+    def _on_schedule_double_click(self, event):
+        """处理课表区域的双击事件，立即重置视图"""
+        self._reset_schedule_view_to_today()
+
+    def _handle_swipe(self, direction: str):
+        """处理滑动逻辑，切换显示的星期"""
+        if direction == 'left':
+            self.displayed_weekday = (self.displayed_weekday + 1) % 7
+        else:
+            self.displayed_weekday = (self.displayed_weekday - 1 + 7) % 7
+        
+        self._update_schedule_display(self.displayed_weekday)
+        self._start_view_reset_timer()
+
+    def _start_view_reset_timer(self):
+        """启动一个计时器，在5秒后将视图重置回当天"""
+        # 如果已有计时器，先取消
+        if self.view_reset_timer:
+            self.root.after_cancel(self.view_reset_timer)
+        
+        # 启动新的5秒计时器
+        self.view_reset_timer = self.root.after(5000, self._reset_schedule_view_to_today)
+
+    def _on_schedule_double_click(self, event):
+        """处理课表区域的双击事件，立即重置视图"""
+        self._reset_schedule_view_to_today()
+
+    def _on_schedule_triple_click(self, event):
+        """处理课表区域的三击事件，开关周课表预览"""
+        from tools.week_preview import WeekPreviewWindow
+        
+        # 如果窗口已存在，则销毁它
+        if self.week_preview_window and self.week_preview_window.winfo_exists():
+            self.week_preview_window.destroy()
+            self.week_preview_window = None
+        else:
+            # 创建并显示新窗口
+            self.week_preview_window = WeekPreviewWindow(self.root, self)
+            self.week_preview_window.show()
+
+    def _handle_swipe(self, direction: str):
+        """处理滑动逻辑，切换显示的星期"""
+        if direction == 'left':
+            self.displayed_weekday = (self.displayed_weekday + 1) % 7
+        else:
+            self.displayed_weekday = (self.displayed_weekday - 1 + 7) % 7
+        
+        self._update_schedule_display(self.displayed_weekday)
+        self._start_view_reset_timer()
+
+    def _start_view_reset_timer(self):
+        """启动一个计时器，在5秒后将视图重置回当天"""
+        # 如果已有计时器，先取消
+        if self.view_reset_timer:
+            self.root.after_cancel(self.view_reset_timer)
+        
+        # 启动新的5秒计时器
+        self.view_reset_timer = self.root.after(5000, self._reset_schedule_view_to_today)
+
+    def _reset_schedule_view_to_today(self):
+        """将课表视图重置为显示当天的课程"""
+        self.view_reset_timer = None
+        today_weekday = datetime.now().weekday()
+        if self.displayed_weekday != today_weekday:
+            self.displayed_weekday = today_weekday
+            self._update_schedule_display(self.displayed_weekday)
+
 
     def _remove_extra_labels(self, schedule: List[Dict[str, str]]) -> None:
         """移除多余的课程标签"""
@@ -670,3 +838,41 @@ class CourseScheduler:
         if self.updater is None:
             self.updater = Updater(self.root)
             self.updater.start_background_check()
+
+    def _check_and_show_tomorrow_preview(self, now: datetime):
+        """检查是否需要显示明日课表预览"""
+        if not self.config_handler.auto_preview_tomorrow_enabled:
+            return
+        if self.tomorrow_preview_shown_for_today:
+            return
+        if self.week_preview_window and self.week_preview_window.winfo_exists():
+            return
+
+        # 检查当天的所有课程是否都已结束
+        today_weekday_str = str(now.weekday())
+        current_schedule_name = self.schedule.get("current_schedule", "default")
+        schedule_data = self.schedule.get("schedules", {}).get(current_schedule_name, {})
+        courses_today = schedule_data.get(today_weekday_str, [])
+
+        if not courses_today:
+            return # 今天没课，不触发
+
+        all_courses_finished = True
+        last_course_end_time = None
+        for course in courses_today:
+            try:
+                end_time = datetime.strptime(course['end_time'], "%H:%M").time()
+                if last_course_end_time is None or end_time > last_course_end_time:
+                    last_course_end_time = end_time
+                if now.time() <= end_time:
+                    all_courses_finished = False
+                    break
+            except (ValueError, KeyError):
+                continue # 忽略格式错误的课程
+
+        # 如果所有课程都结束了，且当前时间在最后一节课结束后，则触发
+        if all_courses_finished and now.time() > last_course_end_time:
+            from tools.week_preview import WeekPreviewWindow
+            self.week_preview_window = WeekPreviewWindow(self.root, self, day_offset=1)
+            self.week_preview_window.show()
+            self.tomorrow_preview_shown_for_today = True

@@ -76,42 +76,19 @@ class ConfigHandler:
                 self.default_courses = self.config.get("default_courses", ["语文", "数学", "英语", "物理", "化学", "生物", "历史", "地理", "政治"])
                 self.font_size = int(self.config.get("font_size", 12))
                 self.font_color = self.config.get("font_color", "#000000")
-                self.time_display_size = self.config.get("time_display_size", 16)
-                self.countdown_size = self.config.get("countdown_size", 14)
-                self.schedule_size = self.config.get("schedule_size", 12)
-                self.fullscreen_subtitle = self.config.get("fullscreen_subtitle", "祝考生考试顺利")
-                self.debug_mode = self.config.get("debug_mode", False)
-                self.auto_update_check_enabled = self.config.get("auto_update_check_enabled", False)
-                self.schedule_rotation_enabled = self.config.get("schedule_rotation_enabled", False)
-                self.rotation_schedule1 = self.config.get("rotation_schedule1", "")
-                self.rotation_schedule2 = self.config.get("rotation_schedule2", "")
-                self.last_weather_location = self.config.get("last_weather_location", "")
-                self.countdown_name = self.config.get("countdown_name", "高考")
-                self.countdown_date = datetime.strptime(
-                    self.config.get("countdown_date", f"{datetime.now().year + 1}-06-07"),
-                    "%Y-%m-%d"
-                )
-                self.heweather_api_key = self.config.get("heweather_api_key", "")
-                self.course_duration = self.config.get("course_duration", 40)
-                self.auto_start = self.config.get("auto_start", False)
-                self.auto_complete_end_time = self.config.get("auto_complete_end_time", True)
-                self.auto_calculate_next_course = self.config.get("auto_calculate_next_course", True)
-                self.break_duration = self.config.get("break_duration", 10)
-                self.default_courses = self.config.get("default_courses", ["语文", "数学", "英语", "物理", "化学", "生物", "历史", "地理", "政治"])
-                self.font_size = int(self.config.get("font_size", 12))
-                self.font_color = self.config.get("font_color", "#000000")
                 self.horizontal_padding = self.config.get("horizontal_padding", 5)
                 self.vertical_padding = self.config.get("vertical_padding", 5)
                 self.time_display_size = self.config.get("time_display_size", 20)
                 self.countdown_size = self.config.get("countdown_size", 18)
                 self.schedule_size = self.config.get("schedule_size", 18)
                 self.transparent_background = self.config.get("transparent_background", True)
-        self.fullscreen_subtitle = self.config.get("fullscreen_subtitle", "祝考生考试顺利")
-        # 优先读取debug_mode，兼容旧配置debug_enabled
-        self.debug_mode = self.config.get("debug_mode", self.config.get("debug_enabled", False))
-        self.auto_update_check_enabled = self.config.get("auto_update_check_enabled", False)
-        self.log_retention_days = self.config.get("log_retention_days", 7)
-        self.check_prerelease = self.config.get("check_prerelease", False)
+                self.fullscreen_subtitle = self.config.get("fullscreen_subtitle", "祝考生考试顺利")
+                # 优先读取debug_mode，兼容旧配置debug_enabled
+                self.debug_mode = self.config.get("debug_mode", self.config.get("debug_enabled", False))
+                self.auto_update_check_enabled = self.config.get("auto_update_check_enabled", False)
+                self.log_retention_days = self.config.get("log_retention_days", 7)
+                self.check_prerelease = self.config.get("check_prerelease", False)
+                self.auto_preview_tomorrow_enabled = self.config.get("auto_preview_tomorrow_enabled", False)
         
         # 新增轮换配置
         self.schedule_rotation_enabled = self.config.get("schedule_rotation_enabled", False)
@@ -197,7 +174,8 @@ class ConfigHandler:
             "rotation_schedule2": self.rotation_schedule2,
             "rotation_start_date": self.rotation_start_date.strftime("%Y-%m-%d"),
             "last_weather_location": self.last_weather_location,
-            "log_retention_days": self.log_retention_days
+            "log_retention_days": self.log_retention_days,
+            "auto_preview_tomorrow_enabled": self.auto_preview_tomorrow_enabled
         }
         config_data["check_prerelease"] = self.check_prerelease
         
