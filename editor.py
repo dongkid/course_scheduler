@@ -50,6 +50,7 @@ class EditorWindow:
         try:
             self.main_app = main_app
             self.window = self._create_window()
+            self.window.protocol("WM_DELETE_WINDOW", self._on_close)
             self._init_styles()  # 初始化样式
             self.day_frames: List[tk.Frame] = []
             # 确保存在last_modified字段
@@ -64,6 +65,13 @@ class EditorWindow:
             self.current_schedule = self.main_app.schedule["current_schedule"]
             self.modified = False  # 跟踪课表是否被修改
             self.selected_rows = set()  # 存储选中行的ID
+            self.previous_tab_index = 0
+            self._is_programmatic_tab_change = False
+
+            # 为临时开关创建BooleanVar
+            self.auto_complete_var = tk.BooleanVar(value=self.main_app.config_handler.auto_complete_end_time)
+            self.auto_calculate_var = tk.BooleanVar(value=self.main_app.config_handler.auto_calculate_next_course)
+
             self._initialize_ui()
             self._create_schedule_selector()
             self._create_batch_operations_bar()  # 添加批量操作按钮栏
@@ -143,6 +151,23 @@ class EditorWindow:
         # 添加删除课表按钮
         self.delete_button = ttk.Button(selector_frame, text="-", command=self._delete_schedule, width=3, style="Small.TButton")
         self.delete_button.pack(side=tk.LEFT, padx=5)
+
+        # 添加临时控制开关（复选框），放在右侧
+        auto_calc_check = ttk.Checkbutton(
+            selector_frame,
+            text="计算下节课时间",
+            variable=self.auto_calculate_var,
+            style="Editor.TCheckbutton"
+        )
+        auto_calc_check.pack(side=tk.RIGHT, padx=5)
+
+        auto_complete_check = ttk.Checkbutton(
+            selector_frame,
+            text="自动补全结束时间",
+            variable=self.auto_complete_var,
+            style="Editor.TCheckbutton"
+        )
+        auto_complete_check.pack(side=tk.RIGHT, padx=5)
         
         # 绑定课表切换事件
         self.schedule_combobox.bind("<<ComboboxSelected>>", self._on_schedule_change)
@@ -266,47 +291,28 @@ class EditorWindow:
     def _on_schedule_change(self, event=None):
         """切换课表时的处理"""
         new_schedule = self.schedule_var.get()
-        if new_schedule != self.current_schedule:
-            # 保存当前自动计算设置
-            original_auto_calculate = self.main_app.config_handler.auto_calculate_next_course
-            
-            try:
-                # 临时禁用自动计算
-                self.main_app.config_handler.auto_calculate_next_course = False
-                
-                # 检查当前课表是否有实际修改
-                if self._is_schedule_modified():
-                    # 检查是否有课程被添加或修改
-                    has_changes = False
-                    for day_frame in self.day_frames:
-                        for widget in day_frame.winfo_children():
-                            if isinstance(widget, tk.Frame):
-                                entries = [w for w in widget.winfo_children() if isinstance(w, tk.Entry)]
-                                if len(entries) >= 3:
-                                    if entries[0].get() != "08:00" or entries[1].get() != "09:00" or entries[2].get():
-                                        has_changes = True
-                                        break
-                        if has_changes:
-                            break
-                    
-                    # 只有实际修改时才提示保存
-                    if has_changes and messagebox.askyesno("切换课表", "当前课表有未保存的修改，是否保存？"):
-                        self.save()
-                
-                # 切换到新课表
-                self.current_schedule = new_schedule
-                self.main_app.schedule["current_schedule"] = new_schedule
-                # 确保新课时有时间记录
-                if new_schedule not in self.schedule_times:
-                    self.schedule_times[new_schedule] = []
-                # 更新UI而不重新创建
-                self._update_ui_with_new_schedule()
-                # 重置修改状态
+        if new_schedule == self.current_schedule:
+            return
+
+        if self.modified:
+            response = messagebox.askyesno(
+                "保存更改",
+                "当前课表有未保存的修改，是否保存？",
+                parent=self.window
+            )
+            if response:  # Yes
+                self.save()
+            else:
+                # 不保存，直接切换，后续UI刷新将丢弃更改
                 self._reset_modified_flag()
-                
-            finally:
-                # 恢复自动计算设置
-                self.main_app.config_handler.auto_calculate_next_course = original_auto_calculate
+
+        # 切换到新课表
+        self.current_schedule = new_schedule
+        self.main_app.schedule["current_schedule"] = new_schedule
+        if new_schedule not in self.schedule_times:
+            self.schedule_times[new_schedule] = []
+        self._update_ui_with_new_schedule()
+        self._reset_modified_flag()
 
     def _update_ui_with_new_schedule(self):
         """用新课表数据更新现有UI"""
@@ -350,6 +356,59 @@ class EditorWindow:
         # 默认打开当天标签页
         current_weekday = datetime.now().weekday()
         self.notebook.select(current_weekday)
+        self.previous_tab_index = current_weekday
+        # 绑定标签页切换事件 (只绑定一次)
+        self.notebook.bind("<<NotebookTabChanged>>", self._on_tab_changed)
+
+    def _on_tab_changed(self, event):
+        """处理标签页切换事件，增加未保存提示"""
+        if self._is_programmatic_tab_change:
+            self._is_programmatic_tab_change = False
+            return
+
+        new_tab_index = self.notebook.index(self.notebook.select())
+        if new_tab_index == self.previous_tab_index:
+            return
+
+        if self.modified:
+            response = messagebox.askyesnocancel(
+                "保存更改",
+                f"星期{WEEKDAYS[self.previous_tab_index]}的课程有未保存的修改。是否保存？",
+                parent=self.window
+            )
+
+            if response is True:  # Yes
+                self._save_day(self.previous_tab_index)
+                self._reset_modified_flag()
+            elif response is False:  # No
+                self._reset_modified_flag()
+            else:  # Cancel
+                self._is_programmatic_tab_change = True
+                self.notebook.select(self.previous_tab_index)
+                return
+
+        # 允许切换，更新UI
+        try:
+            self.create_day_ui(self.day_frames[new_tab_index], str(new_tab_index))
+            self.previous_tab_index = new_tab_index
+        except tk.TclError:
+            pass  # 窗口关闭时可能会引发此错误
+    def _on_close(self):
+        """处理窗口关闭事件"""
+        if self.modified:
+            response = messagebox.askyesnocancel(
+                "保存更改",
+                "当前课表有未保存的修改，是否保存？",
+                parent=self.window
+            )
+            if response is True:  # Yes
+                self.save(show_message=False)
+                self.window.destroy()
+            elif response is False:  # No
+                self.window.destroy()
+            # else: Cancel, do nothing
+        else:
+            self.window.destroy()
 
     def _create_batch_operations_bar(self) -> None:
         """创建批量操作按钮栏"""
@@ -435,65 +494,38 @@ class EditorWindow:
         for widget in frame.winfo_children():
             widget.destroy()
         
-        # 添加课程
         courses = self.main_app.schedule["schedules"][self.current_schedule].get(day, [])
-        
+        courses_to_display = courses
+
         # 如果当天没有课程且存在当前课表的上一次课程时间，提示是否导入
-        if not courses and self.schedule_times[self.current_schedule] and len(self.schedule_times[self.current_schedule]) > 0:
+        if not courses and self.schedule_times[self.current_schedule]:
             if messagebox.askyesno("导入课程时间", "是否导入当前课表的上一次课程时间？"):
-                # 导入时禁用自动补全
-                auto_complete = self.main_app.config_handler.auto_complete_end_time
-                auto_calculate = self.main_app.config_handler.auto_calculate_next_course
-                self.main_app.config_handler.auto_complete_end_time = False
-                self.main_app.config_handler.auto_calculate_next_course = False
-                
-                for course_time in self.schedule_times[self.current_schedule]:
-                    self.add_course_row(frame, len(courses), {
-                        "start_time": course_time["start_time"],
-                        "end_time": course_time["end_time"],
-                        "name": "示例"
-                    })
-                
-                # 恢复自动补全设置
-                self.main_app.config_handler.auto_complete_end_time = auto_complete
-                self.main_app.config_handler.auto_calculate_next_course = auto_calculate
-                return
-        
-        # 正常添加课程（禁用自动补全）
-        auto_complete = self.main_app.config_handler.auto_complete_end_time
-        auto_calculate = self.main_app.config_handler.auto_calculate_next_course
-        self.main_app.config_handler.auto_complete_end_time = False
-        self.main_app.config_handler.auto_calculate_next_course = False
-        
-        for i, course in enumerate(courses):
+                courses_to_display = [{
+                    "start_time": ct["start_time"],
+                    "end_time": ct["end_time"],
+                    "name": "示例"
+                } for ct in self.schedule_times[self.current_schedule]]
+
+        # 绘制课程行
+        for i, course in enumerate(courses_to_display):
             self.add_course_row(frame, i, course)
-        
-        # 恢复自动补全设置
-        self.main_app.config_handler.auto_complete_end_time = auto_complete
-        self.main_app.config_handler.auto_calculate_next_course = auto_calculate
-        
+
         # 更新课程名称建议
         self.all_courses = self._get_all_courses()
-        
+
         # 添加新课程按钮
         style = ttk.Style()
         style.configure("AddSchedule.TButton", font=("微软雅黑", 8), padding=5)
-        
-        # 按钮容器
+
         btn_frame = tk.Frame(frame, bg="white")
         btn_frame.pack(pady=5)
-        
-        # 添加课程按钮
+
+        # "添加课程"按钮
+        # 使用 len(courses_to_display) 来确保索引正确
         ttk.Button(btn_frame, text="添加课程",
-                 command=lambda: self.add_course_row(frame, len(courses)),
+                 command=lambda: self.add_course_row(frame, len(courses_to_display)),
                  style="AddSchedule.TButton").pack(side=tk.LEFT, padx=2)
         
-        # 绑定标签页切换事件
-        def on_tab_change(event):
-            selected_tab = self.notebook.index(self.notebook.select())
-            self.create_day_ui(self.day_frames[selected_tab], str(selected_tab))
-        
-        self.notebook.bind("<<NotebookTabChanged>>", on_tab_change)
     
     def add_course_row(self, parent_frame, index, course=None):
         row_frame = tk.Frame(parent_frame, bg="white", bd=0, relief=tk.FLAT)
@@ -521,6 +553,7 @@ class EditorWindow:
         start_time_entry = tk.Entry(row_frame, width=6, bd=1, relief=tk.SOLID)
         start_time_entry.insert(0, course["start_time"] if course else "08:00")
         start_time_entry.pack(side=tk.LEFT, padx=4, pady=2)
+        row_frame.start_time_entry = start_time_entry # type: ignore
         
         # 开始时间调整按钮
         def show_start_time_picker():
@@ -538,6 +571,7 @@ class EditorWindow:
         end_time_entry = tk.Entry(row_frame, width=6, bd=1, relief=tk.SOLID)
         end_time_entry.insert(0, course["end_time"] if course else "09:00")
         end_time_entry.pack(side=tk.LEFT, padx=4, pady=2)
+        row_frame.end_time_entry = end_time_entry # type: ignore
         
         # 结束时间调整按钮
         def show_end_time_picker():
@@ -573,7 +607,7 @@ class EditorWindow:
         
         # 自动计算结束时间
         def calculate_end_time():
-            if not self.main_app.config_handler.auto_complete_end_time:
+            if not self.auto_complete_var.get():
                 return
             try:
                 start_time_str = start_time_entry.get()
@@ -586,28 +620,44 @@ class EditorWindow:
 
         # 自动计算下一个课程时间
         def calculate_next_course_time():
-            if not self.main_app.config_handler.auto_calculate_next_course:
+            if not self.auto_calculate_var.get():
                 return
             try:
-                # 获取当前行之前的最后一行
-                previous_row = None
-                for widget in parent_frame.winfo_children():
-                    if isinstance(widget, tk.Frame) and widget != row_frame:
-                        previous_row = widget
+                # 强制UI更新以获得正确的控件位置
+                parent_frame.update_idletasks()
                 
+                # 按视觉Y坐标对所有可见的课程行进行排序
+                all_rows = sorted(
+                    [w for w in parent_frame.winfo_children() if isinstance(w, tk.Frame) and hasattr(w, 'row_id') and w.winfo_ismapped()],
+                    key=lambda w: w.winfo_y()
+                )
+
+                # “上一行”是排序列表中的倒数第二个
+                previous_row = all_rows[-2] if len(all_rows) > 1 else None
+
                 if previous_row:
-                    # 获取上一行的结束时间
+                    # 从上一行中找到所有输入框
                     prev_entries = [w for w in previous_row.winfo_children() if isinstance(w, tk.Entry)]
+                    
+                    # 按视觉X坐标排序，以可靠地识别开始/结束时间框
+                    prev_entries.sort(key=lambda w: w.winfo_x())
+                    
+                    # 结束时间框应该是第二个
                     if len(prev_entries) >= 2:
-                        prev_end_time = prev_entries[1].get()
-                        prev_time = datetime.strptime(prev_end_time, "%H:%M")
-                        # 计算下一个课程的开始时间
+                        prev_end_time_str = prev_entries[1].get()
+                        
+                        # 计算新课程的开始时间
+                        prev_time = datetime.strptime(prev_end_time_str, "%H:%M")
                         next_start_time = prev_time + timedelta(minutes=self.main_app.config_handler.break_duration)
+                        
+                        # 更新当前新行的开始时间
                         start_time_entry.delete(0, tk.END)
                         start_time_entry.insert(0, next_start_time.strftime("%H:%M"))
-                        # 自动计算结束时间
+                        
+                        # 自动计算新行的结束时间
                         calculate_end_time()
-            except ValueError:
+            except (ValueError, IndexError) as e:
+                logger.log_debug(f"自动计算下一课程时间失败: {e}")
                 pass
 
         # 时间格式验证和自动修正
@@ -680,8 +730,10 @@ class EditorWindow:
         
         start_time_entry.bind("<FocusOut>", lambda e: [calculate_end_time(), validate_time()])
         
-        # 添加课程时自动计算下一个课程时间
-        calculate_next_course_time()
+        # 仅在用户添加新行时（即 course is None）自动计算下一个课程时间
+        if course is None:
+            calculate_next_course_time()
+        
         end_time_entry.bind("<FocusOut>", lambda e: validate_time())
         
         # 删除按钮
@@ -1018,82 +1070,53 @@ class EditorWindow:
         )
         return result
     
-    def save(self):
+    def _save_day(self, day_index):
+        """保存指定索引日期的课程数据，不进行UI交互。"""
+        day_str = str(day_index)
+        day_frame = self.day_frames[day_index]
+        current_schedule_data = self.main_app.schedule["schedules"][self.current_schedule]
+
+        day_schedule = []
+        visible_rows = sorted(
+            [row for row in day_frame.winfo_children() if isinstance(row, tk.Frame) and hasattr(row, 'row_id')],
+            key=lambda w: w.winfo_y()
+        )
+
+        for row in visible_rows:
+            entries = [w for w in row.winfo_children() if isinstance(w, tk.Entry)]
+            if len(entries) >= 3:
+                start_time, end_time, name = entries[0].get(), entries[1].get(), entries[2].get()
+                if start_time and end_time and name:
+                    day_schedule.append({"start_time": start_time, "end_time": end_time, "name": name})
+
+        current_schedule_data[day_str] = day_schedule
+        self.last_edited_day = day_str
+
+        last_edited_day_courses = current_schedule_data.get(self.last_edited_day, [])
+        self.schedule_times[self.current_schedule] = [
+            {"start_time": c["start_time"], "end_time": c["end_time"]} for c in last_edited_day_courses
+        ]
+
+        self.main_app.schedule["last_modified"] = datetime.now().timestamp()
+        self.main_app.save_schedule()
+
+    def save(self, show_message=True):
+        """保存当前活动标签页的课程。"""
         try:
-            # 保存所有课程
-            self.schedule_times[self.current_schedule] = []  # 清空当前课表的课程时间
-            # 重置修改状态
+            selected_tab_index = self.notebook.index(self.notebook.select())
+            self._save_day(selected_tab_index)
             self._reset_modified_flag()
-            current_schedule = self.main_app.schedule["schedules"][self.current_schedule]
-            
-            for i, day_frame in enumerate(self.day_frames):
-                day_schedule = []
-                for row_frame in day_frame.winfo_children():
-                    if isinstance(row_frame, tk.Frame):
-                        entries = [widget for widget in row_frame.winfo_children() 
-                                 if isinstance(widget, tk.Entry)]
-                        if len(entries) >= 3:
-                            start_time = entries[0].get()
-                            end_time = entries[1].get()
-                            name = entries[2].get()
-                            if start_time and end_time and name:
-                                day_schedule.append({
-                                    "start_time": start_time,
-                                    "end_time": end_time,
-                                    "name": name
-                                })
-                                # 如果是最后编辑的日期，保存当前课表的课程时间
-                                if str(i) == self.last_edited_day:
-                                    self.schedule_times[self.current_schedule].append({
-                                        "start_time": start_time,
-                                        "end_time": end_time
-                                    })
-                # 按界面顺序保存当前标签页课程
-                current_tab = self.notebook.index(self.notebook.select())
-                day_str = str(current_tab)
-                day_frame = self.day_frames[current_tab]
-                
-                # 按实际显示顺序获取课程行
-                visible_rows = [
-                    row for row in day_frame.winfo_children()
-                    if isinstance(row, tk.Frame) and
-                    hasattr(row, 'row_id') and
-                    row.winfo_ismapped()
-                ]
-                
-                # 按Y坐标排序（实际显示顺序）
-                visible_rows.sort(key=lambda w: w.winfo_y())
-                
-                day_schedule = []
-                for row in visible_rows:
-                    entries = [w for w in row.winfo_children() if isinstance(w, tk.Entry)]
-                    if len(entries) >= 3:
-                        start_time = entries[0].get()
-                        end_time = entries[1].get()
-                        name = entries[2].get()
-                        if start_time and end_time and name:
-                            day_schedule.append({
-                                "start_time": start_time,
-                                "end_time": end_time,
-                                "name": name
-                            })
-                
-                current_schedule[day_str] = day_schedule
-            
-            # 更新最后编辑日期为当前日期
-            selected_tab = self.notebook.index(self.notebook.select())
-            self.last_edited_day = str(selected_tab)
-            
-            self.main_app.schedule["last_modified"] = datetime.now().timestamp()
-            self.main_app.save_schedule()
-            
-            # 保存后立即刷新当前标签页
-            current_tab = self.notebook.index(self.notebook.select())
-            self.create_day_ui(self.day_frames[current_tab], str(current_tab))
-            
-            messagebox.showinfo("成功", f"课表'{self.current_schedule}'已保存")
+
+            if show_message:
+                messagebox.showinfo("成功", f"课表'{self.current_schedule}'已保存")
+
+            # 保存后立即刷新当前标签页，以确保显示与数据一致
+            day_str = str(selected_tab_index)
+            day_frame = self.day_frames[selected_tab_index]
+            self.create_day_ui(day_frame, day_str)
         except Exception as e:
-            logger.log_error(e)
+            logger.log_error(f"保存课表时发生错误: {e}")
+            messagebox.showerror("错误", f"保存失败: {str(e)}")
 
     def _toggle_row_selection(self, row_id, row_frame):
         """切换行的选中状态"""
