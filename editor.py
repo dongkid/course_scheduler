@@ -69,6 +69,12 @@ class EditorWindow:
             self._is_programmatic_tab_change = False
             self.is_dialog_open = False
 
+            # 撤销/重做功能
+            self.undo_stack = []
+            self.redo_stack = []
+            self.undo_button = None
+            self.redo_button = None
+
             # 为临时开关创建BooleanVar
             self.auto_complete_var = tk.BooleanVar(value=self.main_app.config_handler.auto_complete_end_time)
             self.auto_calculate_var = tk.BooleanVar(value=self.main_app.config_handler.auto_calculate_next_course)
@@ -76,6 +82,7 @@ class EditorWindow:
             self._initialize_ui()
             self._create_schedule_selector()
             self._create_batch_operations_bar()  # 添加批量操作按钮栏
+            self.window.after(100, self._initial_state_capture) # 捕获初始状态
         except Exception as e:
             logger.log_error(e)
             raise
@@ -205,6 +212,7 @@ class EditorWindow:
                 self.schedule_combobox['values'] = list(self.main_app.schedule["schedules"].keys())
                 self.schedule_combobox.set(new_name)
                 messagebox.showinfo("成功", "课表已重命名")
+                self._clear_history()
             except Exception as e:
                 logger.log_error(e)
                 messagebox.showerror("错误", f"重命名失败: {str(e)}")
@@ -245,6 +253,7 @@ class EditorWindow:
         self.main_app.schedule["current_schedule"] = new_name
         self._update_ui_with_new_schedule()
         self._reset_modified_flag()
+        self._clear_history()
 
     def _add_new_schedule(self):
         """添加新课表"""
@@ -271,6 +280,7 @@ class EditorWindow:
                 self._update_ui_with_new_schedule()
                 # 标记为未修改
                 self._reset_modified_flag()
+                self._clear_history()
         finally:
             self.is_dialog_open = False
 
@@ -296,6 +306,7 @@ class EditorWindow:
                 self.schedule_combobox['values'] = list(self.main_app.schedule["schedules"].keys())
                 self.schedule_combobox.set(new_schedule)
                 self._on_schedule_change()
+                self._clear_history()
         finally:
             self.is_dialog_open = False
 
@@ -336,6 +347,7 @@ class EditorWindow:
                 self.schedule_times[new_schedule] = []
             self._update_ui_with_new_schedule()
             self._reset_modified_flag()
+            self._clear_history()
         finally:
             self.is_dialog_open = False
 
@@ -414,8 +426,10 @@ class EditorWindow:
             if response is True:  # Yes
                 self._save_day(self.previous_tab_index)
                 self._reset_modified_flag()
+                self._clear_history()
             elif response is False:  # No
                 self._reset_modified_flag()
+                self._clear_history()
             else:  # Cancel
                 self._is_programmatic_tab_change = True
                 self.notebook.select(self.previous_tab_index)
@@ -425,6 +439,7 @@ class EditorWindow:
         try:
             self.create_day_ui(self.day_frames[new_tab_index], str(new_tab_index))
             self.previous_tab_index = new_tab_index
+            self._clear_history()
         except tk.TclError:
             pass  # 窗口关闭时可能会引发此错误
     def _on_close(self):
@@ -450,6 +465,115 @@ class EditorWindow:
         finally:
             self.is_dialog_open = False
 
+    def _initial_state_capture(self):
+        """捕获初始状态"""
+        self._capture_state(initial=True)
+
+    def _capture_state(self, initial=False):
+        """捕获当前活动标签页的UI状态，并将其存入撤销栈"""
+        current_tab_index = self.notebook.index(self.notebook.select())
+        day_frame = self.day_frames[current_tab_index]
+        
+        state = []
+        # 按Y坐标排序以确保顺序一致
+        visible_rows = sorted(
+            [row for row in day_frame.winfo_children() if isinstance(row, tk.Frame) and hasattr(row, 'row_id')],
+            key=lambda w: w.winfo_y()
+        )
+
+        for row_frame in visible_rows:
+            entries = [w for w in row_frame.winfo_children() if isinstance(w, tk.Entry)]
+            if len(entries) >= 3:
+                state.append({
+                    "start_time": entries[0].get(),
+                    "end_time": entries[1].get(),
+                    "name": entries[2].get()
+                })
+        
+        # 如果是初始状态，直接设置
+        if initial:
+            self.undo_stack.append(state)
+            self._update_undo_redo_buttons()
+            return
+
+        # 避免重复记录完全相同的状态
+        if self.undo_stack and self.undo_stack[-1] == state:
+            return
+
+        self.undo_stack.append(state)
+        self.redo_stack.clear()  # 任何新操作都会清空重做栈
+        self._update_undo_redo_buttons()
+        self.modified = True # 任何记录的操作都应标记为修改
+
+    def _restore_state(self, state):
+        """根据给定状态恢复UI"""
+        current_tab_index = self.notebook.index(self.notebook.select())
+        day_frame = self.day_frames[current_tab_index]
+
+        # 清除现有UI
+        for widget in day_frame.winfo_children():
+            widget.destroy()
+        
+        # 根据状态重建UI
+        for i, course in enumerate(state):
+            self.add_course_row(day_frame, i, course, record_state=False)
+
+        # 重建“添加课程”按钮
+        style = ttk.Style()
+        style.configure("AddSchedule.TButton", font=("微软雅黑", 8), padding=5)
+        btn_frame = tk.Frame(day_frame, bg="white")
+        btn_frame.pack(pady=5)
+        ttk.Button(btn_frame, text="添加课程",
+                 command=lambda: self.add_course_row(day_frame, len(state)),
+                 style="AddSchedule.TButton").pack(side=tk.LEFT, padx=2)
+        
+        # 只有当恢复后的状态与初始状态不同时，才标记为已修改
+        if self.undo_stack and state != self.undo_stack[0]:
+            self.modified = True
+        else:
+            self.modified = False
+
+    def _undo(self):
+        """执行撤销操作"""
+        if len(self.undo_stack) > 1:
+            current_state = self.undo_stack.pop()
+            self.redo_stack.append(current_state)
+            
+            last_state = self.undo_stack[-1]
+            self._restore_state(last_state)
+            self._update_undo_redo_buttons()
+            
+            # 检查是否回到了初始状态
+            if self.undo_stack and last_state == self.undo_stack[0]:
+                self.modified = False
+            else:
+                self.modified = True
+        
+    def _redo(self):
+        """执行重做操作"""
+        if self.redo_stack:
+            state_to_restore = self.redo_stack.pop()
+            self.undo_stack.append(state_to_restore)
+            self._restore_state(state_to_restore)
+            self._update_undo_redo_buttons()
+            self.modified = True # 任何重做操作都意味着有修改
+
+    def _clear_history(self):
+        """清空撤销和重做历史"""
+        self.undo_stack.clear()
+        self.redo_stack.clear()
+        # 捕获清空后的初始状态
+        self.window.after(50, self._initial_state_capture)
+        self._update_undo_redo_buttons()
+
+    def _update_undo_redo_buttons(self):
+        """更新撤销和重做按钮的状态"""
+        if self.undo_button and self.redo_button:
+            # 撤销按钮：当栈中有多于一个状态时（初始状态之外还有其他状态）才可点击
+            self.undo_button.config(state="normal" if len(self.undo_stack) > 1 else "disabled")
+            # 重做按钮：当重做栈不为空时可点击
+            self.redo_button.config(state="normal" if self.redo_stack else "disabled")
+
     def _create_batch_operations_bar(self) -> None:
         """创建批量操作按钮栏"""
         style = ttk.Style()
@@ -469,6 +593,13 @@ class EditorWindow:
         ttk.Button(batch_frame, text="☑ 全选",
                  command=self._select_all,
                  style="Small.TButton").pack(side=tk.LEFT, padx=4)
+        
+        # 添加撤销和重做按钮
+        self.undo_button = ttk.Button(batch_frame, text="↶", command=self._undo, style="Small.TButton", state="disabled", width=3)
+        self.undo_button.pack(side=tk.LEFT, padx=(10, 2))
+        
+        self.redo_button = ttk.Button(batch_frame, text="↷", command=self._redo, style="Small.TButton", state="disabled", width=3)
+        self.redo_button.pack(side=tk.LEFT, padx=2)
 
         # 批量操作按钮 (右侧)
         ttk.Button(batch_frame, text="导入课程",
@@ -556,7 +687,7 @@ class EditorWindow:
 
         # 绘制课程行
         for i, course in enumerate(courses_to_display):
-            self.add_course_row(frame, i, course)
+            self.add_course_row(frame, i, course, record_state=False)
 
         # 更新课程名称建议
         self.all_courses = self._get_all_courses()
@@ -571,11 +702,13 @@ class EditorWindow:
         # "添加课程"按钮
         # 使用 len(courses_to_display) 来确保索引正确
         ttk.Button(btn_frame, text="添加课程",
-                 command=lambda: self.add_course_row(frame, len(courses_to_display)),
+                 command=lambda: self.add_course_row(frame, len(courses_to_display), record_state=True),
                  style="AddSchedule.TButton").pack(side=tk.LEFT, padx=2)
         
     
-    def add_course_row(self, parent_frame, index, course=None):
+    def add_course_row(self, parent_frame, index, course=None, record_state=True):
+        if record_state and course is None: # 仅在手动添加新行时记录
+            self._capture_state()
         row_frame = tk.Frame(parent_frame, bg="white", bd=0, relief=tk.FLAT)
         row_frame.pack(fill=tk.X, pady=4, padx=2)
         # 生成唯一且稳定的行ID
@@ -611,6 +744,7 @@ class EditorWindow:
                 start_time_entry.delete(0, tk.END)
                 start_time_entry.insert(0, picker.selected_time)
                 calculate_end_time()
+                self._capture_state()
         
         ttk.Button(row_frame, text="🕒", command=show_start_time_picker,
                  style="Editor.TButton").pack(side=tk.LEFT, padx=2)
@@ -628,6 +762,7 @@ class EditorWindow:
             if picker.selected_time:
                 end_time_entry.delete(0, tk.END)
                 end_time_entry.insert(0, picker.selected_time)
+                self._capture_state()
         
         ttk.Button(row_frame, text="🕒", command=show_end_time_picker,
                  style="Editor.TButton").pack(side=tk.LEFT, padx=2)
@@ -637,6 +772,7 @@ class EditorWindow:
         if course and course["name"]:
             name_entry.insert(0, course["name"])
         name_entry.pack(side=tk.LEFT, padx=2, expand=True, fill=tk.X)
+        name_entry.bind("<FocusOut>", lambda e: self._capture_state())
         
         # 历史课程选择框
         history_var = tk.StringVar()
@@ -650,6 +786,7 @@ class EditorWindow:
             if selected_course:
                 name_entry.delete(0, tk.END)
                 name_entry.insert(0, selected_course)
+                self._capture_state()
         
         history_combobox.bind("<<ComboboxSelected>>", on_history_select)
         
@@ -776,13 +913,13 @@ class EditorWindow:
                     end_time_entry.config(fg="red")
                 return False
         
-        start_time_entry.bind("<FocusOut>", lambda e: [calculate_end_time(), validate_time()])
+        start_time_entry.bind("<FocusOut>", lambda e: [calculate_end_time(), validate_time(), self._capture_state()])
         
         # 仅在用户添加新行时（即 course is None）自动计算下一个课程时间
         if course is None:
             calculate_next_course_time()
         
-        end_time_entry.bind("<FocusOut>", lambda e: validate_time())
+        end_time_entry.bind("<FocusOut>", lambda e: [validate_time(), self._capture_state()])
         
         # 删除按钮
         ttk.Button(row_frame, text="×", command=lambda: self.delete_course_row(row_frame),
@@ -801,11 +938,14 @@ class EditorWindow:
                  style="Editor.TButton", width=2).pack(side=tk.RIGHT, padx=2)
     
     def delete_course_row(self, row_frame):
+        self._capture_state()
         row_frame.destroy()
         # 标记为已修改
         self.modified = True
+        self._capture_state()
         
     def move_course_row(self, row_frame, direction):
+        self._capture_state()
         """移动课程行位置 - 更安全的实现"""
         parent = row_frame.master
         if not parent.winfo_exists():
@@ -936,6 +1076,7 @@ class EditorWindow:
             except Exception as e:
                 logger.log_error(f"日志记录错误: {str(e)}")
             self.modified = True
+            self._capture_state()
             
         except Exception as e:
             logger.log_error(f"移动行失败: {str(e)}")
@@ -987,6 +1128,10 @@ class EditorWindow:
         
 
     def _batch_delete(self):
+        if not self.selected_rows:
+            messagebox.showwarning("提示", "请先选中要删除的课程")
+            return
+        self._capture_state()
         """批量删除选中课程"""
         if self.is_dialog_open:
             return
@@ -1006,6 +1151,7 @@ class EditorWindow:
                                 
                 self.selected_rows.clear()
                 self.modified = True
+                self._capture_state()
         finally:
             self.is_dialog_open = False
             
@@ -1046,6 +1192,7 @@ class EditorWindow:
             self.is_dialog_open = False
     
     def _import_from_clipboard(self):
+        self._capture_state()
         """从剪贴板导入课程"""
         if self.is_dialog_open:
             return
@@ -1075,6 +1222,7 @@ class EditorWindow:
                     
             messagebox.showinfo("成功", f"已导入{len(courses)}个课程")
             self.modified = True
+            self._capture_state()
             
         except json.JSONDecodeError:
             messagebox.showerror("错误", "剪贴板中没有有效的课程数据")
@@ -1174,6 +1322,7 @@ class EditorWindow:
             selected_tab_index = self.notebook.index(self.notebook.select())
             self._save_day(selected_tab_index)
             self._reset_modified_flag()
+            self._clear_history()
 
             if show_message:
                 messagebox.showinfo("成功", f"课表'{self.current_schedule}'已保存")
