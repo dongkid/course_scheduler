@@ -1,7 +1,6 @@
 from typing import List
 import tkinter as tk
 import uuid
-import time
 from tkinter import ttk, messagebox, simpledialog
 from constants import WEEKDAYS
 from datetime import datetime, timedelta
@@ -567,12 +566,34 @@ class EditorWindow:
         self._update_undo_redo_buttons()
 
     def _update_undo_redo_buttons(self):
-        """更新撤销和重做按钮的状态"""
-        if self.undo_button and self.redo_button:
-            # 撤销按钮：当栈中有多于一个状态时（初始状态之外还有其他状态）才可点击
-            self.undo_button.config(state="normal" if len(self.undo_stack) > 1 else "disabled")
-            # 重做按钮：当重做栈不为空时可点击
-            self.redo_button.config(state="normal" if self.redo_stack else "disabled")
+        """更新撤销和重做标签的状态"""
+        # 确保控件存在
+        if not hasattr(self, 'undo_button') or not self.undo_button.winfo_exists():
+            return
+
+        # 撤销状态
+        can_undo = len(self.undo_stack) > 1
+        self.undo_button.config(fg="black" if can_undo else "#cccccc")
+        if can_undo:
+            # 避免重复绑定
+            if not self.undo_button.bind("<Button-1>"):
+                self.undo_button.bind("<Button-1>", lambda e: self._undo())
+            self.undo_button.config(cursor="hand2")
+        else:
+            self.undo_button.unbind("<Button-1>")
+            self.undo_button.config(cursor="")
+
+        # 重做状态
+        can_redo = bool(self.redo_stack)
+        self.redo_button.config(fg="black" if can_redo else "#cccccc")
+        if can_redo:
+            # 避免重复绑定
+            if not self.redo_button.bind("<Button-1>"):
+                self.redo_button.bind("<Button-1>", lambda e: self._redo())
+            self.redo_button.config(cursor="hand2")
+        else:
+            self.redo_button.unbind("<Button-1>")
+            self.redo_button.config(cursor="")
 
     def _create_batch_operations_bar(self) -> None:
         """创建批量操作按钮栏"""
@@ -594,12 +615,23 @@ class EditorWindow:
                  command=self._select_all,
                  style="Small.TButton").pack(side=tk.LEFT, padx=4)
         
-        # 添加撤销和重做按钮
-        self.undo_button = ttk.Button(batch_frame, text="↶", command=self._undo, style="Small.TButton", state="disabled", width=3)
-        self.undo_button.pack(side=tk.LEFT, padx=(10, 2))
+        # 定义悬停效果 (仅在启用时)
+        def on_enter(e):
+            if e.widget.cget("fg") == "black":
+                e.widget.config(bg="#f0f0f0")
+        def on_leave(e):
+            e.widget.config(bg="white")
+
+        # 使用 tk.Label 实现无边框按钮
+        self.undo_button = tk.Label(batch_frame, text="↶", font=("Segoe UI Symbol", 14), bg="white")
+        self.undo_button.pack(side=tk.LEFT, padx=(15, 15))
+        self.undo_button.bind("<Enter>", on_enter)
+        self.undo_button.bind("<Leave>", on_leave)
         
-        self.redo_button = ttk.Button(batch_frame, text="↷", command=self._redo, style="Small.TButton", state="disabled", width=3)
-        self.redo_button.pack(side=tk.LEFT, padx=2)
+        self.redo_button = tk.Label(batch_frame, text="↷", font=("Segoe UI Symbol", 14), bg="white")
+        self.redo_button.pack(side=tk.LEFT, padx=(0, 15))
+        self.redo_button.bind("<Enter>", on_enter)
+        self.redo_button.bind("<Leave>", on_leave)
 
         # 批量操作按钮 (右侧)
         ttk.Button(batch_frame, text="导入课程",
@@ -1285,6 +1317,8 @@ class EditorWindow:
     
     def _save_day(self, day_index):
         """保存指定索引日期的课程数据，不进行UI交互。"""
+        import os
+        import shutil
         day_str = str(day_index)
         day_frame = self.day_frames[day_index]
         current_schedule_data = self.main_app.schedule["schedules"][self.current_schedule]
@@ -1311,6 +1345,16 @@ class EditorWindow:
         ]
 
         self.main_app.schedule["last_modified"] = datetime.now().timestamp()
+        
+        # 创建备份
+        try:
+            schedule_path = "schedule.json"
+            backup_path = "schedule.json.bak"
+            if os.path.exists(schedule_path):
+                shutil.copy(schedule_path, backup_path)
+        except Exception as e:
+            logger.log_error(f"创建课表备份失败: {e}")
+            
         self.main_app.save_schedule()
 
     def save(self, show_message=True):

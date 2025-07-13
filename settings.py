@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 import sys
-from tkinter import messagebox, colorchooser
+from tkinter import messagebox, colorchooser, simpledialog
 from datetime import datetime
 from constants import DEFAULT_GEOMETRY, CONFIG_FILE, APP_NAME, AUTHOR, VERSION, PROJECT_URL
 from about_window import AboutWindow
@@ -49,6 +49,7 @@ class SettingsWindow:
             self.window = self._create_window()
             self.applying = False
             self._initialize_ui()
+            self._load_config_into_ui() # 加载初始配置
         except Exception as e:
             logger.log_error(e)
             raise
@@ -67,9 +68,9 @@ class SettingsWindow:
         self.style.configure("TLabel", background="white", 
                            font=("微软雅黑", 14))
         # 新增小按钮样式
-        self.style.configure("PMSmall.TButton", 
+        self.style.configure("PMSmall.TButton",
                            font=("微软雅黑", 10),
-                           padding=0,
+                           padding=5,
                            width=3)
         self.style.configure("TLabelframe", background="white")
         self.style.configure("TLabelframe.Label", background="white")
@@ -82,6 +83,12 @@ class SettingsWindow:
         self.style.map("White.TCheckbutton",
                       background=[("active", "white")],
                       foreground=[("active", "black")])
+        self.style.configure("White.TRadiobutton",
+                           background="white",
+                           font=("微软雅黑", 12))
+        self.style.map("White.TRadiobutton",
+                       background=[("active", "white")],
+                       foreground=[("active", "black")])
         self.style.configure("Title.TLabel", font=("微软雅黑", 24, "bold"),
                            foreground="#2c3e50")
         self.style.configure("Subtitle.TLabel", font=("微软雅黑", 14),
@@ -127,14 +134,17 @@ class SettingsWindow:
             child.configure(background="white")
         
         # 创建各个设置标签页
-        self._create_layout_tab()
-        self._create_window_tab()
+        self._create_ui_settings_tab()
         self._create_course_tab()
         self._create_theme_tab()
         self._create_tools_tab()
         self._create_other_tab()
+        self._create_backup_restore_tab()
 
         # 在Notebook下方创建操作按钮
+        # 在Notebook下方创建配置管理和操作按钮
+        self._create_config_selector(main_frame)
+
         button_frame = ttk.Frame(main_frame, style="TFrame")
         button_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=10)
         
@@ -151,19 +161,50 @@ class SettingsWindow:
             command=self.restart_ui,
             style="TButton"
         ).pack(side=tk.LEFT, padx=5, pady=10, fill=tk.X, expand=True)
+    
+    def _create_config_selector(self, parent):
+        """创建配置选择和管理控件"""
+        selector_frame = ttk.Frame(parent, style="TFrame")
+        selector_frame.pack(fill=tk.X, pady=(10, 0))
+
+        tk.Label(selector_frame, text="当前配置:", bg="white").pack(side=tk.LEFT, padx=(0, 5))
+
+        self.config_var = tk.StringVar(value=self.main_app.config_handler.config.get("current_config"))
+        self.config_combobox = ttk.Combobox(
+            selector_frame,
+            textvariable=self.config_var,
+            state="readonly"
+        )
+        self.config_combobox['values'] = self.main_app.config_handler.get_config_names()
+        self.config_combobox.pack(side=tk.LEFT, padx=5)
+
+        # 添加新配置按钮
+        ttk.Button(selector_frame, text="+", command=self._add_new_config, style="PMSmall.TButton").pack(side=tk.LEFT, padx=5)
         
-    def _create_layout_tab(self) -> None:
-        """创建排版设置标签页"""
+        # 添加复制配置按钮
+        ttk.Button(selector_frame, text="⧉", command=self._copy_config, style="PMSmall.TButton").pack(side=tk.LEFT, padx=5)
+        
+        # 添加重命名按钮
+        ttk.Button(selector_frame, text="✎", command=self._rename_config, style="PMSmall.TButton").pack(side=tk.LEFT, padx=5)
+        
+        # 添加删除配置按钮
+        ttk.Button(selector_frame, text="-", command=self._delete_config, style="PMSmall.TButton").pack(side=tk.LEFT, padx=5)
+
+        # 绑定配置切换事件
+        self.config_combobox.bind("<<ComboboxSelected>>", self._on_config_change)
+        
+    def _create_ui_settings_tab(self) -> None:
+        """创建界面设置标签页"""
         scrollable_tab = ScrollableFrame(self.notebook)
-        self.notebook.add(scrollable_tab, text="排版设置")
-        layout_frame = scrollable_tab.scrollable_frame
-        
+        self.notebook.add(scrollable_tab, text="界面设置")
+        ui_frame = scrollable_tab.scrollable_frame
+
         def create_spinbox(frame, entry_var, row):
             """创建带加减按钮的输入控件"""
             # 减按钮（-1）
             ttk.Button(
-                frame, 
-                text="-", 
+                frame,
+                text="-",
                 style="PMSmall.TButton",
             command=lambda: entry_var.set(max(0, int(entry_var.get() or 0) - 1))
             ).grid(row=row, column=2, padx=(10,0), pady=5, ipadx=2, ipady=1)
@@ -175,9 +216,84 @@ class SettingsWindow:
                 style="PMSmall.TButton",
             command=lambda: entry_var.set(int(entry_var.get() or 0) + 1)
             ).grid(row=row, column=3, padx=(0,10), pady=5, ipadx=2, ipady=1)
+
+        def create_button(frame, text, dx, dy):
+            button = ttk.Button(frame, text=text, width=5, style="TButton")
+            button.pack(side=tk.LEFT, padx=5, pady=5)
+            
+            def start_move():
+                self.move_window(dx, dy)
+                current_delay = getattr(button, 'current_delay', 100)
+                new_delay = max(10, current_delay - 5)
+                button.current_delay = new_delay
+                button.after_id = button.after(new_delay, start_move)
+            
+            def stop_move():
+                if hasattr(button, 'after_id'):
+                    button.after_cancel(button.after_id)
+                    del button.after_id
+                if hasattr(button, 'current_delay'):
+                    del button.current_delay
+            
+            button.bind("<ButtonPress-1>", lambda e: start_move())
+            button.bind("<ButtonRelease-1>", lambda e: stop_move())
+            return button
+
+        # 窗口位置控制
+        pos_frame = ttk.LabelFrame(ui_frame, text="窗口位置", style="TFrame")
+        pos_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        create_button(pos_frame, "←", -10, 0)
+        create_button(pos_frame, "→", 10, 0)
+        create_button(pos_frame, "↑", 0, -10)
+        create_button(pos_frame, "↓", 0, 10)
+
+        # 窗口大小控制
+        size_frame = ttk.LabelFrame(ui_frame, text="窗口大小", style="TFrame")
+        size_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        # 宽度设置带加减按钮
+        width_var = tk.StringVar(value=self.main_app.root.winfo_width())
+        ttk.Label(size_frame, text="宽度:").grid(row=0, column=0, padx=5, pady=5)
+        self.width_entry = ttk.Entry(size_frame, width=5, textvariable=width_var)
+        self.width_entry.grid(row=0, column=1, padx=5, pady=5)
+        
+        # 宽度加减按钮
+        ttk.Button(
+            size_frame,
+            text="-",
+            style="PMSmall.TButton",
+            command=lambda: width_var.set(max(100, int(width_var.get() or 100) - 10))
+        ).grid(row=0, column=2, padx=(10,0), pady=5)
+        ttk.Button(
+            size_frame,
+            text="+",
+            style="PMSmall.TButton",
+            command=lambda: width_var.set(int(width_var.get() or 100) + 10)
+        ).grid(row=0, column=3, padx=(0,10), pady=5)
+
+        # 高度设置带加减按钮
+        height_var = tk.StringVar(value=self.main_app.root.winfo_height())
+        ttk.Label(size_frame, text="高度:").grid(row=1, column=0, padx=5, pady=5)
+        self.height_entry = ttk.Entry(size_frame, width=5, textvariable=height_var)
+        self.height_entry.grid(row=1, column=1, padx=5, pady=5)
+        
+        # 高度加减按钮
+        ttk.Button(
+            size_frame,
+            text="-",
+            style="PMSmall.TButton",
+            command=lambda: height_var.set(max(100, int(height_var.get() or 100) - 10))
+        ).grid(row=1, column=2, padx=(10,0), pady=5)
+        ttk.Button(
+            size_frame,
+            text="+",
+            style="PMSmall.TButton",
+            command=lambda: height_var.set(int(height_var.get() or 100) + 10)
+        ).grid(row=1, column=3, padx=(0,10), pady=5)
             
         # ========== 控件大小设置 ==========
-        control_size_frame = ttk.LabelFrame(layout_frame, text="控件大小", style="TFrame")
+        control_size_frame = ttk.LabelFrame(ui_frame, text="控件大小", style="TFrame")
         control_size_frame.pack(fill=tk.X, padx=10, pady=5)
 
         # 时间显示大小（新增按钮）
@@ -202,7 +318,7 @@ class SettingsWindow:
         create_spinbox(control_size_frame, schedule_size_var, 2)
 
         # ========== 间距设置 ==========
-        padding_frame = ttk.LabelFrame(layout_frame, text="间距设置", style="TFrame")
+        padding_frame = ttk.LabelFrame(ui_frame, text="间距设置", style="TFrame")
         padding_frame.pack(fill=tk.X, padx=10, pady=5)
 
         # 水平间距（新增按钮）
@@ -218,87 +334,6 @@ class SettingsWindow:
         self.vertical_padding = ttk.Entry(padding_frame, width=5, textvariable=vertical_var)
         self.vertical_padding.grid(row=1, column=1, padx=5, pady=5)
         create_spinbox(padding_frame, vertical_var, 1)
-    
-    def _create_window_tab(self) -> None:
-        """创建窗口控制标签页"""
-        scrollable_tab = ScrollableFrame(self.notebook)
-        self.notebook.add(scrollable_tab, text="窗口控制")
-        window_frame = scrollable_tab.scrollable_frame
-        
-        # 窗口位置控制
-        pos_frame = ttk.LabelFrame(window_frame, text="窗口位置", style="TFrame")
-        pos_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        def create_button(frame, text, dx, dy):
-            button = ttk.Button(frame, text=text, width=5, style="TButton")
-            button.pack(side=tk.LEFT, padx=5, pady=5)
-            
-            def start_move():
-                self.move_window(dx, dy)
-                current_delay = getattr(button, 'current_delay', 100)
-                new_delay = max(10, current_delay - 5)
-                button.current_delay = new_delay
-                button.after_id = button.after(new_delay, start_move)
-            
-            def stop_move():
-                if hasattr(button, 'after_id'):
-                    button.after_cancel(button.after_id)
-                    del button.after_id
-                if hasattr(button, 'current_delay'):
-                    del button.current_delay
-            
-            button.bind("<ButtonPress-1>", lambda e: start_move())
-            button.bind("<ButtonRelease-1>", lambda e: stop_move())
-            return button
-        
-        create_button(pos_frame, "←", -10, 0)
-        create_button(pos_frame, "→", 10, 0)
-        create_button(pos_frame, "↑", 0, -10)
-        create_button(pos_frame, "↓", 0, 10)
-
-        # 窗口大小控制
-        size_frame = ttk.LabelFrame(window_frame, text="窗口大小", style="TFrame")
-        size_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        # 宽度设置带加减按钮
-        width_var = tk.StringVar(value=self.main_app.root.winfo_width())
-        ttk.Label(size_frame, text="宽度:").grid(row=0, column=0, padx=5, pady=5)
-        self.width_entry = ttk.Entry(size_frame, width=5, textvariable=width_var)
-        self.width_entry.grid(row=0, column=1, padx=5, pady=5)
-        
-        # 宽度加减按钮
-        ttk.Button(
-            size_frame, 
-            text="-", 
-            style="PMSmall.TButton",
-            command=lambda: width_var.set(max(100, int(width_var.get() or 100) - 10))
-        ).grid(row=0, column=2, padx=(10,0), pady=5)
-        ttk.Button(
-            size_frame,
-            text="+",
-            style="PMSmall.TButton",
-            command=lambda: width_var.set(int(width_var.get() or 100) + 10)
-        ).grid(row=0, column=3, padx=(0,10), pady=5)
-
-        # 高度设置带加减按钮
-        height_var = tk.StringVar(value=self.main_app.root.winfo_height())
-        ttk.Label(size_frame, text="高度:").grid(row=1, column=0, padx=5, pady=5)
-        self.height_entry = ttk.Entry(size_frame, width=5, textvariable=height_var)
-        self.height_entry.grid(row=1, column=1, padx=5, pady=5)
-        
-        # 高度加减按钮
-        ttk.Button(
-            size_frame, 
-            text="-", 
-            style="PMSmall.TButton",
-            command=lambda: height_var.set(max(100, int(height_var.get() or 100) - 10))
-        ).grid(row=1, column=2, padx=(10,0), pady=5)
-        ttk.Button(
-            size_frame,
-            text="+",
-            style="PMSmall.TButton",
-            command=lambda: height_var.set(int(height_var.get() or 100) + 10)
-        ).grid(row=1, column=3, padx=(0,10), pady=5)
 
     def _create_course_tab(self) -> None:
         """创建课程设置标签页"""
@@ -526,6 +561,91 @@ class SettingsWindow:
         self.log_retention_days_entry.grid(row=0, column=1, padx=5, pady=5)
         self.log_retention_days_entry.insert(0, str(self.main_app.config_handler.log_retention_days))
 
+    def _create_backup_restore_tab(self) -> None:
+        """创建备份与还原标签页"""
+        scrollable_tab = ScrollableFrame(self.notebook)
+        self.notebook.add(scrollable_tab, text="备份与还原")
+        backup_frame = scrollable_tab.scrollable_frame
+
+        # --- 导出区域 ---
+        export_frame = ttk.LabelFrame(backup_frame, text="导出数据")
+        export_frame.pack(fill=tk.X, padx=10, pady=10, ipady=5)
+
+        ttk.Label(export_frame, text="选择要导出的配置:").pack(anchor=tk.W, padx=5, pady=2)
+        
+        self.config_listbox = tk.Listbox(export_frame, selectmode=tk.MULTIPLE, height=5, bg="white", highlightthickness=0)
+        for config_name in self.main_app.config_handler.get_config_names():
+            self.config_listbox.insert(tk.END, config_name)
+        self.config_listbox.pack(fill=tk.X, expand=True, padx=5, pady=2)
+
+        self.include_schedule_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            export_frame,
+            text="同时导出课表数据",
+            variable=self.include_schedule_var,
+            style="White.TCheckbutton"
+        ).pack(anchor=tk.W, padx=5, pady=5)
+
+        ttk.Button(
+            export_frame,
+            text="导出...",
+            command=self._handle_export,
+            style="TButton"
+        ).pack(pady=5)
+
+        # --- 导入区域 ---
+        import_frame = ttk.LabelFrame(backup_frame, text="导入数据")
+        import_frame.pack(fill=tk.X, padx=10, pady=10, ipady=5)
+
+        self.import_mode_var = tk.StringVar(value="incremental")
+        
+        ttk.Radiobutton(
+            import_frame,
+            text="增量导入 (合并数据，存在则覆盖)",
+            variable=self.import_mode_var,
+            value="incremental",
+            style="White.TRadiobutton"
+        ).pack(anchor=tk.W, padx=5)
+
+        ttk.Radiobutton(
+            import_frame,
+            text="覆盖导入 (清空现有数据后导入)",
+            variable=self.import_mode_var,
+            value="overwrite",
+            style="White.TRadiobutton"
+        ).pack(anchor=tk.W, padx=5)
+
+        ttk.Button(
+            import_frame,
+            text="从文件导入...",
+            command=self._handle_import,
+            style="TButton"
+        ).pack(pady=10)
+
+    def _handle_export(self):
+        """处理导出按钮点击事件"""
+        from backup_restore_manager import BackupRestoreManager
+        selected_indices = self.config_listbox.curselection()
+        selected_configs = [self.config_listbox.get(i) for i in selected_indices]
+        include_schedule = self.include_schedule_var.get()
+
+        if not selected_configs and not include_schedule:
+            messagebox.showwarning("未选择", "请至少选择一个配置方案或勾选课表数据进行导出。", parent=self.window)
+            return
+
+        manager = BackupRestoreManager(self.main_app)
+        manager.export_data(selected_configs, include_schedule)
+
+    def _handle_import(self):
+        """处理导入按钮点击事件"""
+        from backup_restore_manager import BackupRestoreManager
+        mode = self.import_mode_var.get()
+        manager = BackupRestoreManager(self.main_app)
+        manager.import_data(mode)
+        # 导入后，可能需要刷新设置窗口中的某些内容
+        self._load_config_into_ui()
+        self._update_config_combobox()
+
 
     def _get_contrasting_color(self, hex_color):
         """Calculates contrasting text color (black or white) for a given hex background color."""
@@ -573,10 +693,9 @@ class SettingsWindow:
         x = max(0, min(x, screen_width - window_width))
         y = max(0, min(y, screen_height - window_height))
         
-        # 更新geometry并保存
+        # 更新geometry
         self.main_app.config_handler.geometry = f"{window_width}x{window_height}+{x}+{y}"
         self.main_app.root.geometry(f"+{x}+{y}")
-        self.main_app.config_handler.save_config()
     
     def _save_heweather_key(self):
         """保存和风天气API Key"""
@@ -762,3 +881,123 @@ class SettingsWindow:
             messagebox.showerror("错误", "保存设置时发生错误")
         finally:
             self.applying = False  # 重置标志位
+
+    def _add_new_config(self):
+        """添加新配置"""
+        new_name = simpledialog.askstring("新配置", "请输入新配置名称:", parent=self.window)
+        if new_name and new_name.strip():
+            new_name = new_name.strip()
+            if self.main_app.config_handler.add_config(new_name):
+                self._update_config_combobox(new_name)
+                messagebox.showinfo("成功", f"配置 '{new_name}' 已添加", parent=self.window)
+            else:
+                messagebox.showerror("错误", "该名称已存在", parent=self.window)
+
+    def _copy_config(self):
+        """复制当前配置"""
+        original_name = self.config_var.get()
+        new_name = simpledialog.askstring("复制配置", "请输入新配置的名称:", initialvalue=f"{original_name}_副本", parent=self.window)
+        if new_name and new_name != original_name:
+            if self.main_app.config_handler.copy_config(original_name, new_name):
+                self._update_config_combobox(new_name)
+                messagebox.showinfo("成功", "配置已复制", parent=self.window)
+            else:
+                messagebox.showerror("错误", "复制失败，新名称可能已存在", parent=self.window)
+
+    def _rename_config(self):
+        """重命名当前配置"""
+        old_name = self.config_var.get()
+        new_name = simpledialog.askstring("重命名配置", "请输入新名称:", initialvalue=old_name, parent=self.window)
+        if new_name and new_name.strip() and new_name.strip() != old_name:
+            new_name = new_name.strip()
+            if self.main_app.config_handler.rename_config(old_name, new_name):
+                self._update_config_combobox(new_name)
+                messagebox.showinfo("成功", "配置已重命名", parent=self.window)
+            else:
+                messagebox.showerror("错误", "重命名失败，新名称可能已存在", parent=self.window)
+
+    def _delete_config(self):
+        """删除当前配置"""
+        name_to_delete = self.config_var.get()
+        if messagebox.askyesno("确认删除", f"确定要删除配置 '{name_to_delete}' 吗？", parent=self.window):
+            if self.main_app.config_handler.delete_config(name_to_delete):
+                new_current = self.main_app.config_handler.config.get("current_config")
+                self._update_config_combobox(new_current)
+                self._load_config_into_ui() # 重新加载新当前配置的UI
+                messagebox.showinfo("成功", "配置已删除", parent=self.window)
+            else:
+                messagebox.showwarning("警告", "无法删除，至少需要保留一个配置", parent=self.window)
+
+    def _on_config_change(self, event=None):
+        """处理配置切换事件"""
+        new_config_name = self.config_var.get()
+        self.main_app.config_handler.switch_config(new_config_name)
+        self._load_config_into_ui()
+
+    def _update_config_combobox(self, new_value=None):
+        """更新配置下拉框的内容和选定值"""
+        self.config_combobox['values'] = self.main_app.config_handler.get_config_names()
+        if new_value:
+            self.config_combobox.set(new_value)
+        else:
+            self.config_combobox.set(self.main_app.config_handler.config.get("current_config"))
+
+    def _load_config_into_ui(self):
+        """将当前配置加载到整个UI界面"""
+        handler = self.main_app.config_handler
+        
+        # 排版设置
+        self.time_display_size.delete(0, tk.END)
+        self.time_display_size.insert(0, str(handler.time_display_size))
+        self.countdown_size.delete(0, tk.END)
+        self.countdown_size.insert(0, str(handler.countdown_size))
+        self.schedule_size.delete(0, tk.END)
+        self.schedule_size.insert(0, str(handler.schedule_size))
+        self.horizontal_padding.delete(0, tk.END)
+        self.horizontal_padding.insert(0, str(handler.horizontal_padding))
+        self.vertical_padding.delete(0, tk.END)
+        self.vertical_padding.insert(0, str(handler.vertical_padding))
+
+        # 窗口控制
+        self.width_entry.delete(0, tk.END)
+        self.width_entry.insert(0, self.main_app.root.winfo_width())
+        self.height_entry.delete(0, tk.END)
+        self.height_entry.insert(0, self.main_app.root.winfo_height())
+
+        # 课程设置
+        self.duration_entry.delete(0, tk.END)
+        self.duration_entry.insert(0, str(handler.course_duration))
+        self.auto_complete_var.set(handler.auto_complete_end_time)
+        self.auto_calculate_var.set(handler.auto_calculate_next_course)
+        self.break_duration_entry.delete(0, tk.END)
+        self.break_duration_entry.insert(0, str(handler.break_duration))
+        self.auto_preview_tomorrow_var.set(handler.auto_preview_tomorrow_enabled)
+        self.rotation_var.set(handler.schedule_rotation_enabled)
+        self.schedule1_var.set(handler.rotation_schedule1)
+        self.schedule2_var.set(handler.rotation_schedule2)
+        self.countdown_name_entry.delete(0, tk.END)
+        self.countdown_name_entry.insert(0, handler.countdown_name)
+        self.countdown_date_entry.delete(0, tk.END)
+        self.countdown_date_entry.insert(0, handler.countdown_date.strftime("%Y-%m-%d"))
+        self.courses_text.delete("1.0", tk.END)
+        self.courses_text.insert(tk.END, "\n".join(handler.default_courses))
+
+        # 主题设置
+        self.font_size.set(handler.font_size)
+        self.font_color = handler.font_color
+        text_color = self._get_contrasting_color(self.font_color)
+        self.color_preview.config(bg=self.font_color, fg=text_color)
+        self.transparent_var.set(handler.transparent_background)
+
+        # 小工具
+        self.fullscreen_subtitle_entry.delete(0, tk.END)
+        self.fullscreen_subtitle_entry.insert(0, handler.fullscreen_subtitle)
+        self.heweather_key_entry.delete(0, tk.END)
+        self.heweather_key_entry.insert(0, handler.heweather_api_key)
+
+        # 其他设置
+        self.auto_start_var.set(handler.auto_start)
+        self.debug_var.set(handler.debug_mode)
+        self.auto_update_check_var.set(handler.auto_update_check_enabled)
+        self.log_retention_days_entry.delete(0, tk.END)
+        self.log_retention_days_entry.insert(0, str(handler.log_retention_days))
