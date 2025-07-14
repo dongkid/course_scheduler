@@ -460,12 +460,12 @@ class CourseScheduler:
             color = self._get_course_color(now, course)
             if i < len(self.course_labels):
                 # 强制更新标签颜色状态
-                self._update_existing_label(i, course, color, force_update=True)
+                self._update_existing_label(i, course, color, now, force_update=True)
                 # 调整grid行号
                 self.course_labels[i].master.grid(row=i)
             else:
                 # 创建新标签并指定grid行号
-                self._create_new_label(course, color, row=i)
+                self._create_new_label(course, color, now, row=i)
         
         # 移除多余的标签
         self._remove_extra_labels(schedule_for_day)
@@ -492,12 +492,19 @@ class CourseScheduler:
         
         # 从缓存获取或计算
         if cache_key not in self._course_time_cache:
-            self._course_time_cache[cache_key] = (
-                datetime.strptime(course["start_time"], "%H:%M").time(),
-                datetime.strptime(course["end_time"], "%H:%M").time()
-            )
+            try:
+                self._course_time_cache[cache_key] = (
+                    datetime.strptime(course["start_time"], "%H:%M").time(),
+                    datetime.strptime(course["end_time"], "%H:%M").time()
+                )
+            except (KeyError, ValueError):
+                # 如果时间格式错误或键不存在，缓存一个无效标志并返回红色
+                self._course_time_cache[cache_key] = (None, None)
+                return "red"
             
         start_time, end_time = self._course_time_cache[cache_key]
+        if not start_time: # 检查无效标志
+            return "red"
         current_time = now.time()
         
         if start_time <= current_time <= end_time:
@@ -506,10 +513,42 @@ class CourseScheduler:
             return "green"   # 已上完的课程为绿色
         return "red"     # 未上过的课程为红色
 
-    def _update_existing_label(self, index: int, course: Dict[str, str], color: str, force_update: bool = False) -> None:
+    def _get_course_display_text(self, course: Dict[str, str], color: str, now: datetime) -> str:
+        """根据课程状态和设置生成显示文本"""
+        mode = self.config_handler.current_course_time_display_mode
+        
+        # 仅当课程正在进行中 ("yellow") 且模式不是 "default" 时，才应用特殊显示
+        if color == "yellow" and mode != "default":
+            end_time_str = course.get("end_time", "00:00")
+
+            if mode == "end_time":
+                return f"{end_time_str} {course['name']}"
+            
+            if mode == "countdown":
+                try:
+                    end_time_obj = datetime.strptime(end_time_str, "%H:%M").time()
+                    end_datetime = now.replace(hour=end_time_obj.hour, minute=end_time_obj.minute, second=0, microsecond=0)
+                    
+                    # 如果结束时间在当前时间之前（例如，刚好过了一秒），则显示为0
+                    if end_datetime < now:
+                        remaining_seconds = 0
+                    else:
+                        remaining_seconds = (end_datetime - now).total_seconds()
+
+                    minutes = int(remaining_seconds // 60)
+                    seconds = int(remaining_seconds % 60)
+                    return f"{minutes:02d}:{seconds:02d} {course['name']}"
+                except (ValueError, KeyError):
+                    # 如果时间格式错误或键不存在，回退到默认显示
+                    return f"{course['start_time']} {course['name']}"
+
+        # 默认显示开始时间
+        return f"{course['start_time']} {course['name']}"
+
+    def _update_existing_label(self, index: int, course: Dict[str, str], color: str, now: datetime, force_update: bool = False) -> None:
         """更新现有课程标签"""
         label = self.course_labels[index]
-        new_text = f"{course['start_time']} {course['name']}"
+        new_text = self._get_course_display_text(course, color, now)
         
         # 始终更新文本和颜色状态
         label.config(text=new_text)
@@ -591,14 +630,14 @@ class CourseScheduler:
         # 强制更新所有部件
         self.root.update_idletasks()
 
-    def _create_new_label(self, course: Dict[str, str], color: str, row: int) -> None:
+    def _create_new_label(self, course: Dict[str, str], color: str, now: datetime, row: int) -> None:
         """创建新课程标签"""
         course_frame = tk.Frame(self.schedule_frame)
         course_frame.grid(row=row, column=0, sticky="ew", pady=2)  # 使用指定的行号
         
         label = tk.Label(
             course_frame,
-            text=f"{course['start_time']} {course['name']}",
+            text=self._get_course_display_text(course, color, now),
             font=("微软雅黑", self.config_handler.schedule_size, "bold"),
             fg=self.config_handler.font_color,
             anchor='w'
@@ -848,30 +887,45 @@ class CourseScheduler:
         if self.week_preview_window and self.week_preview_window.winfo_exists():
             return
 
-        # 检查当天的所有课程是否都已结束
         today_weekday_str = str(now.weekday())
         current_schedule_name = self.schedule.get("current_schedule", "default")
         schedule_data = self.schedule.get("schedules", {}).get(current_schedule_name, {})
         courses_today = schedule_data.get(today_weekday_str, [])
 
         if not courses_today:
-            return # 今天没课，不触发
+            return  # 今天没课，不触发
 
+        trigger_count = self.config_handler.preview_tomorrow_trigger_count
+        
+        finished_courses_count = 0
         all_courses_finished = True
         last_course_end_time = None
+
         for course in courses_today:
             try:
                 end_time = datetime.strptime(course['end_time'], "%H:%M").time()
                 if last_course_end_time is None or end_time > last_course_end_time:
                     last_course_end_time = end_time
-                if now.time() <= end_time:
+                
+                if now.time() > end_time:
+                    finished_courses_count += 1
+                else:
                     all_courses_finished = False
-                    break
             except (ValueError, KeyError):
                 continue # 忽略格式错误的课程
 
-        # 如果所有课程都结束了，且当前时间在最后一节课结束后，则触发
-        if all_courses_finished and now.time() > last_course_end_time:
+        should_trigger = False
+        # 检查触发条件
+        if trigger_count > 0:
+            # 按第N节课触发
+            if finished_courses_count >= trigger_count:
+                should_trigger = True
+        else:
+            # 按全部课程结束后触发 (旧逻辑)
+            if all_courses_finished and last_course_end_time and now.time() > last_course_end_time:
+                should_trigger = True
+
+        if should_trigger:
             from tools.week_preview import WeekPreviewWindow
             self.week_preview_window = WeekPreviewWindow(self.root, self, day_offset=1)
             self.week_preview_window.show()

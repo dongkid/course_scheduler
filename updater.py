@@ -16,7 +16,7 @@ import socket
 
 # --- Constants for Multi-threaded Download ---
 CHUNK_SIZE = 512 * 1024  # 512KB per chunk for fine-grained task queue
-MAX_THREADS = 10  # Max number of download threads
+MAX_THREADS = 16  # Max number of download threads
 DOWNLOAD_RETRY = 2 # Retries for a single chunk
 
 class Updater:
@@ -497,6 +497,77 @@ del "%~f0"
             logger.log_error(f"安装脚本创建失败: {e}")
             messagebox.showerror("安装失败", f"创建安装脚本时出错:\n{e}")
 
+    def _show_update_confirmation_dialog(self, release_info: Dict[str, Any]) -> bool:
+        """
+        显示一个包含更新日志的自定义对话框，并返回用户的选择。
+        :param release_info: 包含版本信息的字典。
+        :return: 如果用户选择更新，则返回True，否则返回False。
+        """
+        result = [False]  # 使用列表以便在内部函数中修改
+
+        dialog = tk.Toplevel(self.parent_window)
+        dialog.title("发现新版本")
+        dialog.configure(bg="white")
+
+        # 窗口尺寸和屏幕居中
+        width, height = 450, 350
+        screen_width = dialog.winfo_screenwidth()
+        screen_height = dialog.winfo_screenheight()
+        x = (screen_width // 2) - (width // 2)
+        y = (screen_height // 2) - (height // 2)
+        dialog.geometry(f"{width}x{height}+{x}+{y}")
+        dialog.minsize(400, 300)
+
+        main_frame = ttk.Frame(dialog, style="Updater.TFrame", padding=15)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # 标题
+        title_label = ttk.Label(main_frame, text=f"发现新版本: {release_info['version']}", font=("Microsoft YaHei", 12, "bold"), style="Updater.TLabel")
+        title_label.pack(anchor='w', pady=(0, 10))
+
+        # 按钮区域
+        button_frame = ttk.Frame(main_frame, style="Updater.TFrame")
+        button_frame.pack(side=tk.BOTTOM, pady=(10, 0)) # Default anchor is CENTER
+
+        # 更新日志区域
+        notes_frame = ttk.Frame(main_frame, style="Updater.TFrame", relief="solid", borderwidth=1)
+        notes_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+        
+        notes_text = tk.Text(notes_frame, wrap=tk.WORD, bg="white", relief="flat", font=("Microsoft YaHei", 9), borderwidth=0, highlightthickness=0)
+        notes_text.insert(tk.END, release_info.get("notes", "没有提供更新日志。"))
+        notes_text.config(state=tk.DISABLED)
+
+        scrollbar = ttk.Scrollbar(notes_frame, orient="vertical", command=notes_text.yview)
+        notes_text['yscrollcommand'] = scrollbar.set
+        
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        notes_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        def on_update():
+            result[0] = True
+            dialog.destroy()
+
+        def on_cancel():
+            result[0] = False
+            dialog.destroy()
+
+        # 为按钮创建更紧凑的样式
+        s = ttk.Style(dialog)
+        s.configure("Compact.TButton", padding=(5, 2), font=("Microsoft YaHei", 8))
+
+        update_button = ttk.Button(button_frame, text="立即更新", command=on_update, style="Compact.TButton")
+        update_button.pack(side=tk.LEFT, padx=(0, 5))
+        
+        cancel_button = ttk.Button(button_frame, text="稍后", command=on_cancel, style="Compact.TButton")
+        cancel_button.pack(side=tk.LEFT, padx=(5, 0))
+
+        dialog.protocol("WM_DELETE_WINDOW", on_cancel)
+        dialog.transient(self.parent_window)
+        dialog.grab_set()
+        dialog.wait_window(dialog)
+        
+        return result[0]
+
     def run_update_flow(self, silent: bool = False):
         """协调整个更新流程，处理强制中断。"""
         logger.log_info(f"请求启动更新流程 (silent={silent})。")
@@ -534,7 +605,7 @@ del "%~f0"
                         messagebox.showwarning("未找到文件", "找到了新版本，但没有合适的安装文件。")
                     return
 
-                if messagebox.askyesno("发现新版本", f"发现新版本 {latest_release['version']}。\n\n是否立即下载并安装？"):
+                if self._show_update_confirmation_dialog(latest_release):
                     self._create_progress_window()
                     download_dest = os.path.join(os.environ['TEMP'], asset["name"])
                     

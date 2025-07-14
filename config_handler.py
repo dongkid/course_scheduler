@@ -27,21 +27,23 @@ class ConfigHandler:
         self.font_color = "#000000"
         self.horizontal_padding = 10
         self.vertical_padding = 5
-        self.time_display_size = 16
-        self.countdown_size = 14
-        self.schedule_size = 12
-        self.transparent_background = False
+        self.time_display_size = 20
+        self.countdown_size = 18
+        self.schedule_size = 18
+        self.transparent_background = True
         self.fullscreen_subtitle = "祝考生考试顺利"
         self.debug_mode = False
         self.auto_update_check_enabled = False
         self.log_retention_days = 7
         self.check_prerelease = False
         self.auto_preview_tomorrow_enabled = False
+        self.preview_tomorrow_trigger_count = 0
         self.schedule_rotation_enabled = False
         self.rotation_schedule1 = ""
         self.rotation_schedule2 = ""
         self.rotation_start_date = datetime.now()
         self.last_weather_location = ""
+        self.current_course_time_display_mode = "default"
 
     def check_registry_auto_start(self):
         """检查注册表中是否存在开机自启动项"""
@@ -105,21 +107,23 @@ class ConfigHandler:
             "font_color": "#000000",
             "horizontal_padding": 10,
             "vertical_padding": 5,
-            "time_display_size": 16,
-            "countdown_size": 14,
-            "schedule_size": 12,
-            "transparent_background": False,
+            "time_display_size": 20,
+            "countdown_size": 18,
+            "schedule_size": 18,
+            "transparent_background": True,
             "fullscreen_subtitle": "祝考生考试顺利",
             "debug_mode": False,
             "auto_update_check_enabled": False,
             "log_retention_days": 7,
             "check_prerelease": False,
             "auto_preview_tomorrow_enabled": False,
+            "preview_tomorrow_trigger_count": 0,
             "schedule_rotation_enabled": False,
             "rotation_schedule1": "",
             "rotation_schedule2": "",
             "rotation_start_date": datetime.now().strftime("%Y-%m-%d"),
-            "last_weather_location": ""
+            "last_weather_location": "",
+            "current_course_time_display_mode": "default"
         }
         self.config = {
             "config_version": CONFIG_VERSION,
@@ -189,11 +193,13 @@ class ConfigHandler:
         self.log_retention_days = get_int("log_retention_days", 7)
         self.check_prerelease = get_bool("check_prerelease", False)
         self.auto_preview_tomorrow_enabled = get_bool("auto_preview_tomorrow_enabled", False)
+        self.preview_tomorrow_trigger_count = get_int("preview_tomorrow_trigger_count", 0)
         self.schedule_rotation_enabled = get_bool("schedule_rotation_enabled", False)
         self.rotation_schedule1 = get_str("rotation_schedule1", "")
         self.rotation_schedule2 = get_str("rotation_schedule2", "")
         self.rotation_start_date = get_date("rotation_start_date", datetime.now().strftime("%Y-%m-%d"))
         self.last_weather_location = get_str("last_weather_location", "")
+        self.current_course_time_display_mode = get_str("current_course_time_display_mode", "default")
 
     def save_config(self):
         """将当前实例属性保存到文件中对应的配置方案下"""
@@ -240,11 +246,13 @@ class ConfigHandler:
             "log_retention_days": self.log_retention_days,
             "check_prerelease": self.check_prerelease,
             "auto_preview_tomorrow_enabled": self.auto_preview_tomorrow_enabled,
+            "preview_tomorrow_trigger_count": self.preview_tomorrow_trigger_count,
             "schedule_rotation_enabled": self.schedule_rotation_enabled,
             "rotation_schedule1": self.rotation_schedule1,
             "rotation_schedule2": self.rotation_schedule2,
             "rotation_start_date": self.rotation_start_date.strftime("%Y-%m-%d"),
-            "last_weather_location": self.last_weather_location
+            "last_weather_location": self.last_weather_location,
+            "current_course_time_display_mode": self.current_course_time_display_mode
         })
         
         # 更新到主配置字典中

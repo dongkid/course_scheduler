@@ -380,7 +380,46 @@ class SettingsWindow:
             preview_frame, text="结束后自动预览明天课表",
             variable=self.auto_preview_tomorrow_var,
             style="White.TCheckbutton")
-        self.auto_preview_tomorrow_check.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky=tk.W)
+        self.auto_preview_tomorrow_check.grid(row=0, column=0, columnspan=4, padx=5, pady=5, sticky=tk.W)
+
+        # 第N节课后预览
+        ttk.Label(preview_frame, text="第N节课后预览 (0为全结束后):").grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
+        
+        self.preview_trigger_count_var = tk.StringVar(value=self.main_app.config_handler.preview_tomorrow_trigger_count)
+        self.preview_trigger_count_entry = ttk.Entry(preview_frame, width=5, textvariable=self.preview_trigger_count_var)
+        self.preview_trigger_count_entry.grid(row=1, column=1, padx=5, pady=5)
+
+        # 减按钮
+        ttk.Button(
+            preview_frame,
+            text="-",
+            style="PMSmall.TButton",
+            command=lambda: self.preview_trigger_count_var.set(max(0, int(self.preview_trigger_count_var.get() or 0) - 1))
+        ).grid(row=1, column=2, padx=(5,0), pady=5)
+        
+        # 加按钮
+        ttk.Button(
+            preview_frame,
+            text="+",
+            style="PMSmall.TButton",
+            command=lambda: self.preview_trigger_count_var.set(int(self.preview_trigger_count_var.get() or 0) + 1)
+        ).grid(row=1, column=3, padx=(0,5), pady=5)
+
+        # 当前课程时间显示设置
+        display_mode_frame = ttk.LabelFrame(course_frame, text="当前课程时间显示设置", style="TFrame")
+        display_mode_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        self.course_time_display_mode_var = tk.StringVar(value=self.main_app.config_handler.current_course_time_display_mode)
+        
+        modes = [("默认", "default"), ("结束时间", "end_time"), ("倒计时", "countdown")]
+        for i, (text, mode) in enumerate(modes):
+            ttk.Radiobutton(
+                display_mode_frame,
+                text=text,
+                variable=self.course_time_display_mode_var,
+                value=mode,
+                style="White.TRadiobutton"
+            ).grid(row=0, column=i, padx=5, pady=5, sticky=tk.W)
 
         # 课表轮换设置
         rotation_frame = ttk.LabelFrame(course_frame, text="课表轮换设置", style="TFrame")
@@ -843,8 +882,24 @@ class SettingsWindow:
             self.main_app.config_handler.rotation_schedule1 = self.schedule1_var.get()
             self.main_app.config_handler.rotation_schedule2 = self.schedule2_var.get()
 
+            # 保存课表轮换设置
+            self.main_app.config_handler.schedule_rotation_enabled = self.rotation_var.get()
+            self.main_app.config_handler.rotation_schedule1 = self.schedule1_var.get()
+            self.main_app.config_handler.rotation_schedule2 = self.schedule2_var.get()
+
+            # 应用当前课程时间显示模式设置
+            self.main_app.config_handler.current_course_time_display_mode = self.course_time_display_mode_var.get()
+
             # 应用预览设置
             self.main_app.config_handler.auto_preview_tomorrow_enabled = self.auto_preview_tomorrow_var.get()
+            try:
+                trigger_count = int(self.preview_trigger_count_var.get())
+                if trigger_count < 0:
+                    raise ValueError
+                self.main_app.config_handler.preview_tomorrow_trigger_count = trigger_count
+            except ValueError:
+                messagebox.showerror("错误", "请输入有效的预览触发课程数（非负整数）", parent=self.window)
+                return
             
             # 应用日志保留天数设置
             try:
@@ -972,7 +1027,9 @@ class SettingsWindow:
         self.break_duration_entry.delete(0, tk.END)
         self.break_duration_entry.insert(0, str(handler.break_duration))
         self.auto_preview_tomorrow_var.set(handler.auto_preview_tomorrow_enabled)
+        self.preview_trigger_count_var.set(str(handler.preview_tomorrow_trigger_count))
         self.rotation_var.set(handler.schedule_rotation_enabled)
+        self.course_time_display_mode_var.set(handler.current_course_time_display_mode)
         self.schedule1_var.set(handler.rotation_schedule1)
         self.schedule2_var.set(handler.rotation_schedule2)
         self.countdown_name_entry.delete(0, tk.END)
