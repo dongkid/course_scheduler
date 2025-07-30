@@ -546,11 +546,29 @@ class SettingsWindow:
         # 天气工具设置
         weather_frame = ttk.LabelFrame(tools_frame, text="天气工具设置", style="TFrame")
         weather_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        # 天气API提供商选择
+        ttk.Label(weather_frame, text="天气数据源:").grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
+        self.weather_provider_var = tk.StringVar(value=self.main_app.config_handler.weather_api_provider)
         
-        ttk.Label(weather_frame, text="和风天气API Key:").grid(row=0, column=0, padx=5, pady=5)
+        heweather_radio = ttk.Radiobutton(
+            weather_frame, text="和风天气", variable=self.weather_provider_var,
+            value="heweather", command=self._on_provider_change, style="White.TRadiobutton"
+        )
+        heweather_radio.grid(row=0, column=1, padx=5, pady=5, sticky=tk.W)
+
+        timer7_radio = ttk.Radiobutton(
+            weather_frame, text="7Timer!", variable=self.weather_provider_var,
+            value="7timer", command=self._on_provider_change, style="White.TRadiobutton"
+        )
+        timer7_radio.grid(row=0, column=2, padx=5, pady=5, sticky=tk.W)
+
+        # 和风天气API Key输入框 (根据选择动态显示)
+        self.heweather_key_label = ttk.Label(weather_frame, text="和风天气API Key:")
         self.heweather_key_entry = ttk.Entry(weather_frame, width=35)
-        self.heweather_key_entry.grid(row=0, column=1, padx=5, pady=5)
         self.heweather_key_entry.insert(0, self.main_app.config_handler.heweather_api_key)
+
+        self._on_provider_change() # 初始化显隐状态
 
     def _create_other_tab(self) -> None:
         """创建其他设置标签页"""
@@ -875,6 +893,7 @@ class SettingsWindow:
             self.main_app.config_handler.fullscreen_subtitle = self.fullscreen_subtitle_entry.get()
             
             # 保存和风天气API Key
+            self.main_app.config_handler.weather_api_provider = self.weather_provider_var.get()
             self.main_app.config_handler.heweather_api_key = self.heweather_key_entry.get()
             
             # 保存课表轮换设置
@@ -1039,22 +1058,11 @@ class SettingsWindow:
         self.courses_text.delete("1.0", tk.END)
         self.courses_text.insert(tk.END, "\n".join(handler.default_courses))
 
-        # 主题设置
-        self.font_size.set(handler.font_size)
-        self.font_color = handler.font_color
-        text_color = self._get_contrasting_color(self.font_color)
-        self.color_preview.config(bg=self.font_color, fg=text_color)
-        self.transparent_var.set(handler.transparent_background)
-
-        # 小工具
-        self.fullscreen_subtitle_entry.delete(0, tk.END)
-        self.fullscreen_subtitle_entry.insert(0, handler.fullscreen_subtitle)
-        self.heweather_key_entry.delete(0, tk.END)
-        self.heweather_key_entry.insert(0, handler.heweather_api_key)
-
-        # 其他设置
-        self.auto_start_var.set(handler.auto_start)
-        self.debug_var.set(handler.debug_mode)
-        self.auto_update_check_var.set(handler.auto_update_check_enabled)
-        self.log_retention_days_entry.delete(0, tk.END)
-        self.log_retention_days_entry.insert(0, str(handler.log_retention_days))
+    def _on_provider_change(self):
+        """根据选择的天气API提供商，显示或隐藏API Key输入框"""
+        if self.weather_provider_var.get() == "heweather":
+            self.heweather_key_label.grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
+            self.heweather_key_entry.grid(row=1, column=1, columnspan=2, padx=5, pady=5, sticky=tk.W)
+        else:
+            self.heweather_key_label.grid_remove()
+            self.heweather_key_entry.grid_remove()

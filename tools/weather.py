@@ -1,252 +1,192 @@
-import requests
+# -*- coding: utf-8 -*-
+"""
+天气工具的主模块。
+包含 WeatherManager，用于根据配置选择和管理天气数据提供者。
+还包含 WeatherTool，作为与UI层交互的入口点。
+"""
 import tkinter as tk
-import threading
-import time
-from tkinter import ttk, messagebox
-from tkinter.simpledialog import Dialog
-from config_handler import ConfigHandler
-from tools.weather_ui import WeatherUI
+from tkinter import messagebox
 from threading import Thread
-import datetime
+from typing import Optional, TYPE_CHECKING
+
 from logger import logger
-class WeatherAPI:
-    def __init__(self):
-        self.config = ConfigHandler()
-        self.config.initialize_config()  # 确保配置加载
-        logger.log_debug(f"WeatherAPI初始化 - API Key: {self.config.heweather_api_key}")
-        # 直接访问已加载的配置
-        self.base_url = "https://devapi.qweather.com/v7/"
-        self.geo_url = "https://geoapi.qweather.com/v2/city/lookup"
-    
-    def get_location_id(self, location_name):
-        """获取地区Location ID"""
-        headers = {
-            "X-QW-Api-Key": f"{self.config.heweather_api_key}"
-        }
-        params = {
-            "location": location_name,
-            "range": "cn",
-            "number": 1
-        }
+from config_handler import ConfigHandler
+# from tools.weather_ui import WeatherUI, MiniWeatherUI # Lazy load
+from .weather_provider import WeatherProvider
+# from .heweather_provider import HeweatherProvider # Lazy load
+# from .seven_timer_provider import SevenTimerProvider # Lazy load
+from .weather_models import WeatherData, Location, Forecast, HourlyForecast
+import datetime
+
+if TYPE_CHECKING:
+    from .heweather_provider import HeweatherProvider
+    from .seven_timer_provider import SevenTimerProvider
+    from tools.weather_ui import WeatherUI, MiniWeatherUI
+
+class WeatherManager:
+    """
+    天气管理器。
+    根据配置动态选择并调用相应的天气数据提供者。
+    实现了提供者的懒加载。
+    """
+    def __init__(self, config: ConfigHandler):
+        self.config = config
+        self._provider: Optional[WeatherProvider] = None
+        self._provider_name: Optional[str] = None
+        # self._initialize_provider() # Removed for lazy loading
+
+    @property
+    def provider(self) -> Optional[WeatherProvider]:
+        """懒加载并返回天气数据提供者实例"""
+        # 如果提供者配置已更改，或提供者尚未初始化，则重新初始化
+        if self.config.weather_api_provider != self._provider_name or self._provider is None:
+            self._initialize_provider()
+        return self._provider
+
+    def _initialize_provider(self):
+        """根据配置初始化天气数据提供者"""
+        provider_name = self.config.weather_api_provider
+        logger.log_debug(f"Lazy initializing weather provider: {provider_name}")
+        
+        # Lazy import providers
+        if provider_name == "heweather":
+            from .heweather_provider import HeweatherProvider
+            self._provider = HeweatherProvider(self.config)
+        elif provider_name == "7timer":
+            from .seven_timer_provider import SevenTimerProvider
+            self._provider = SevenTimerProvider()
+        else:
+            logger.log_error(f"Unknown weather provider: {provider_name}")
+            messagebox.showerror("Config Error", f"Unknown weather provider: {provider_name}")
+            from .heweather_provider import HeweatherProvider
+            self._provider = HeweatherProvider(self.config) # Fallback
+        
+        self._provider_name = provider_name
+
+    def _get_test_city_weather(self) -> WeatherData:
+        """生成并返回一个用于测试的固定天气数据对象"""
+        test_location = Location(
+            name="测试城市",
+            city="测试市",
+            province="测试省",
+            country="中国"
+        )
+        
+        today = datetime.date.today()
+        
+        # 创建三天的预报
+        forecasts = []
+        for i in range(3):
+            current_date = today + datetime.timedelta(days=i)
+            forecast = Forecast(
+                date=current_date.strftime("%Y-%m-%d"),
+                temp_max=30 - i * 2,
+                temp_min=20 - i,
+                text_day=["晴", "多云", "小雨"][i % 3],
+                text_night=["晴", "阴", "中雨"][i % 3],
+                wind_dir_day="东南风",
+                wind_scale_day=f"{3+i}",
+                humidity=60 + i * 5,
+                pressure=1000 + i,
+                uv_index=5 - i,
+                visibility=15 + i,
+                sunrise="06:30",
+                sunset="18:30"
+            )
+            
+            # 为第一天添加一些小时预报
+            if i == 0:
+                hourly_forecasts = []
+                for h in range(6, 24, 2):
+                    hourly = HourlyForecast(
+                        time=f"{h:02d}:00",
+                        temp=22 + (h // 4),
+                        weather=["晴", "多云", "晴", "多云", "阴", "晴"][(h//2) % 6],
+                        icon="clear" # 简化处理
+                    )
+                    hourly_forecasts.append(hourly)
+                forecast.hourly_forecasts = hourly_forecasts
+
+            forecasts.append(forecast)
+
+        return WeatherData(
+            location=test_location,
+            source="测试数据",
+            forecasts=forecasts
+        )
+
+    def get_weather(self, location_query: str) -> Optional[WeatherData]:
+        """
+        获取天气数据。
+        现在通过懒加载的 provider 属性获取提供者。
+        """
+        if location_query == "测试城市":
+            logger.log_info("Returning test city weather data")
+            return self._get_test_city_weather()
+            
+        if self.provider:
+            return self.provider.get_forecast(location_query)
+        return None
+
+    def get_location_by_ip(self) -> Optional[str]:
+        """
+        通过IP地址获取地理位置。
+        注意：此功能目前依赖于和风天气提供者，未来可以抽象出来。
+        """
+        # 暂时保留旧的IP定位逻辑，因为它与UI紧密耦合
+        # TODO: 将IP定位抽象成一个独立的工具或服务
         try:
-            logger.log_debug(f"请求地理API: {self.geo_url}")
-            logger.log_debug(f"请求头: {headers}")
-            logger.log_debug(f"参数: {params}")
-            response = requests.get(self.geo_url, headers=headers, params=params, timeout=10)
-            http_status = response.status_code
-            data = response.json()
-            if not isinstance(data, dict):
-                raise ValueError("Invalid API response format")
-                
-            # 添加HTTP状态码处理
-            # 地理API特定HTTP错误映射
-            HTTP_ERROR_MAP = {
-                400: "请求参数错误（请检查地区名称格式）",
-                401: "API密钥无效或未经授权",
-                403: "访问权限受限（请检查套餐类型）",
-                404: "指定的地区不存在",
-                429: "请求次数超过限制",
-                500: "和风天气服务器内部错误"
-            }
-            if http_status != 200:
-                error_msg = HTTP_ERROR_MAP.get(http_status, f"未知HTTP错误({http_status})")
-                logger.log_error(f"HTTP错误 [{http_status}]: {error_msg}")
-                messagebox.showerror("HTTP错误", f"{error_msg}\n请检查API地址或网络连接")
-                return None
-                
-            error_code = data.get("code")
-            if error_code == "200" and data.get("location"):
-                return data["location"][0]["id"]
-            
-            # 错误码映射表
-            ERROR_CODES = {
-                "400": "请求参数错误，请检查地区名称格式",
-                "401": "API密钥无效或过期，请检查配置",
-                "402": "账户余额不足，请及时充值",
-                "403": "访问权限受限，请检查套餐权限",
-                "404": "指定的地区不存在",
-                "429": "请求过于频繁，请稍后重试",
-                "500": "服务器内部错误，请稍后再试"
-            }
-            
-            # 优先使用v2错误信息
-            if "error" in data:
-                error_detail = f"{data['error'].get('title', '')}: {data['error'].get('detail', '')}"
-                invalid_params = ", ".join(data['error'].get('invalidParams', []))
-                if invalid_params:
-                    error_detail += f"\n无效参数: {invalid_params}"
-            else:
-                error_detail = ERROR_CODES.get(error_code, "未知错误")
-            
-            error_msg = f"API请求失败 [代码:{error_code}]\n{error_detail}"
-            logger.log_error(f"地区查询失败: {error_msg}")
-            messagebox.showerror("请求错误", error_msg)
-            return None
-        except requests.exceptions.RequestException as e:
-            http_status = getattr(e.response, 'status_code', '未知')
-            error_msg = f"网络请求失败 [HTTP:{http_status}]\n{str(e)}"
-            messagebox.showerror("网络错误", error_msg)
-            logger.log_error(f"WeatherAPI请求异常: {error_msg}")
-            return None
-    
-    def get_location_by_ip(self):
-        """通过IP地址获取地理位置"""
-        try:
+            import requests
+            import re
             request_url = "https://2024.ip138.com/"
-            logger.log_debug(f"开始IP定位请求: {request_url}")
-            
             ip_response = requests.get(request_url, timeout=5, headers={
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
             })
-            logger.log_debug(f"IP定位响应状态码: {ip_response.status_code}")
-            
             if ip_response.status_code == 200:
-                # 使用正则表达式提取地理位置信息
-                import re
                 match = re.search(r"来自：([^\n<]+)", ip_response.text)
                 if match:
-                    location_str = match.group(1).strip()
-                    # 解析格式
-                    parts = location_str.split()
-                    if len(parts) >= 2:
-                        # 提取省份、城市、区县信息
-                        area = parts[0][2:]
-                        operator = parts[1]  # 运营商信息
-                        
-                        # 解析省市区（示例：广东深圳福田）
-                        province = area[:2] + "省"
-                        city = area[2:4] + "市"
-                        district = area[4:] if len(area) > 4 else ""
-                        
-                        detailed_location = f"{province} {city} {district}".strip()
-                        
-                        logger.log_debug(f"IP定位成功详情: {location_str}")
-                        logger.log_debug(f"解析结果: 省份={province} 城市={city} 区/县={district}")
-                        logger.log_debug(f"网络运营商: {operator}")
-                        
-                        return detailed_location
-                    
-            logger.log_warning(f"IP定位失败: HTTP {ip_response.status_code}")
+                    return match.group(1).strip()
             return None
         except Exception as e:
-            logger.log_error(f"IP定位请求异常: {str(e)}", exc_info=True)
+            logger.log_error(f"IP定位请求异常: {str(e)}")
             return None
 
-    def get_3d_weather(self, location_id):
-        """获取三天天气预报"""
-        headers = {
-            "Authorization": f"Bearer {self.config.heweather_api_key}"
-        }
-        params = {
-            "location": location_id,
-            "key": self.config.heweather_api_key
-        }
-        try:
-            # 添加调试信息并修正请求参数
-            url = f"{self.base_url}weather/3d"
-            logger.log_debug(f"请求天气API: {url}")
-            
-            # 和风天气要求API key作为查询参数
-            params = {
-                "location": location_id,
-                "key": self.config.heweather_api_key
-            }
-            logger.log_debug(f"最终请求参数: {params}")
-            
-            response = requests.get(url, params=params, timeout=10)
-            http_status = response.status_code
-            logger.log_debug(f"响应状态码: {http_status}")
-            logger.log_debug(f"原始响应内容: {response.text[:500]}")  # 截取前500字符避免日志过大
-            
-            # 预处理HTTP错误
-            HTTP_ERROR_MAP = {
-                400: "请求参数错误",
-                401: "未经授权",
-                403: "访问被拒绝",
-                404: "API端点不存在",
-                429: "请求次数超限",
-                500: "服务器内部错误"
-            }
-            if http_status != 200:
-                error_msg = HTTP_ERROR_MAP.get(http_status, f"未知HTTP错误({http_status})")
-                logger.error(f"天气API HTTP错误 [{http_status}]: {error_msg}")
-                messagebox.showerror("HTTP错误", f"{error_msg}\n请检查API配置")
-                return None
-                
-            data = response.json()
-            logger.log_debug(f"解析后的数据: {data}")
-            
-            error_code = data.get("code")
-            if error_code == "200":
-                return data["daily"]
-            
-            # 天气API错误码处理
-            WEATHER_ERRORS = {
-                "204": "该地区暂无天气数据",
-                "400": "请求参数错误，请检查位置ID",
-                "401": "API密钥验证失败",
-                "402": "账户额度不足，请续费",
-                "403": "无权限访问此数据（可能包含：额度用尽/套餐权限不足/安全限制）",
-                "404": "天气数据不存在",
-                "429": "请求超限（每分钟/每日/每月），请降低频率",
-                "500": "服务器内部错误，请稍后重试",
-                # v2错误码处理
-                "NO_CREDIT": "账户额度不足，请续费（错误码v2）",
-                "SECURITY_RESTRICTION": "安全限制，请检查请求频率和权限（错误码v2）",
-                "DATA_NOT_AVAILABLE": "该地区数据不可用（错误码v2）"
-            }
-            
-            # 处理v2错误格式
-            error_detail = ""
-            if "error" in data:
-                error_obj = data["error"]
-                error_detail = f"{error_obj.get('title', '')}\n{error_obj.get('detail', '')}"
-                if error_obj.get('type'):
-                    error_detail += f"\n参考文档: {error_obj['type']}"
-                if error_obj.get('invalidParams'):
-                    error_detail += f"\n无效参数: {', '.join(error_obj['invalidParams'])}"
-            else:
-                error_detail = WEATHER_ERRORS.get(str(error_code), "未知错误，请检查API响应")
-            
-            # 添加HTTP状态码信息
-            http_status = getattr(response, 'status_code', '未知')
-            full_error_msg = f"天气请求失败 [HTTP:{http_status} 代码:{error_code}]\n{error_detail}"
-            
-            logger.log_error(full_error_msg)
-            messagebox.showerror("请求错误", full_error_msg)
-            return None
-        except requests.exceptions.RequestException as e:
-            messagebox.showerror("错误", f"天气请求失败：{e}")
-            logger.log_error(f"WeatherAPI请求异常：{str(e)}")
-            # 记录响应内容（如果存在）
-            if 'response' in locals():
-                logger.log_error(f"错误响应内容: {response.text[:1000]}")
-        except KeyError as e:
-            messagebox.showerror("错误", "天气数据解析失败")
-            logger.log_error(f"API响应格式错误：{str(e)}")
-            return None
 
 class WeatherTool:
     def __init__(self):
         self.name = "天气"
-        self.api = WeatherAPI()
-        self.ui = None
-        self.mini_ui = None
-        
+        self.config = ConfigHandler()
+        self.manager: Optional[WeatherManager] = None
+        self.ui: Optional['WeatherUI'] = None
+        self.mini_ui: Optional['MiniWeatherUI'] = None
+
+    def _get_manager(self) -> WeatherManager:
+        """懒加载并返回 WeatherManager 实例"""
+        if self.manager is None:
+            logger.log_debug("Lazy initializing WeatherManager.")
+            self.manager = WeatherManager(self.config)
+        return self.manager
+
     def show(self):
         """显示天气界面"""
-        if not self.api.config.heweather_api_key:
+        if self.config.weather_api_provider == "heweather" and not self.config.heweather_api_key:
             messagebox.showerror("错误", "请先配置和风天气API密钥")
             return
-            
-        if not self.ui:
-            self.ui = WeatherUI(self.api)
-        self.ui.deiconify()
+        
+        from tools.weather_ui import WeatherUI # Lazy import
+        manager = self._get_manager()
 
-    def get_mini_ui(self, master=None):
+        if not self.ui or not self.ui.winfo_exists():
+            self.ui = WeatherUI(manager)
+        self.ui.deiconify()
+        self.ui.lift()
+
+    def get_mini_ui(self, master=None) -> 'MiniWeatherUI':
         """获取迷你天气界面组件"""
-        # 销毁现有实例（如果存在）
-        if self.mini_ui:
+        from tools.weather_ui import MiniWeatherUI # Lazy import
+        manager = self._get_manager()
+
+        if self.mini_ui and self.mini_ui.winfo_exists():
             try:
                 self.mini_ui._safe_destroy()
             except Exception as e:
@@ -254,11 +194,8 @@ class WeatherTool:
             finally:
                 self.mini_ui = None
         
-        from tools.weather_ui import MiniWeatherUI
-        self.mini_ui = MiniWeatherUI(self.api, master=master)
-        # 添加窗口关闭回调
+        self.mini_ui = MiniWeatherUI(manager, master=master)
         self.mini_ui.protocol("WM_DELETE_WINDOW", self._on_mini_ui_close)
-        # 初始加载数据
         Thread(target=self.mini_ui.refresh_weather).start()
         return self.mini_ui
 
