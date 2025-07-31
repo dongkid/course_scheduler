@@ -196,6 +196,40 @@ class CourseScheduler:
         """保存课表"""
         with open(SCHEDULE_FILE, 'w', encoding='utf-8') as f:
             json.dump(self.schedule, f, ensure_ascii=False, indent=2)
+
+    def import_schedule_data(self, new_data: Dict[str, List[Dict[str, str]]]):
+        """
+        从 AI 助手导入新的课表数据并保存。
+        
+        Args:
+            new_data: 一个字典，键是星期几（"0"-"6"），值是课程列表。
+        """
+        try:
+            current_schedule_name = self.schedule.get("current_schedule", "default")
+            
+            # 确保 schedules 字典和当前课表名称存在
+            if "schedules" not in self.schedule:
+                self.schedule["schedules"] = {}
+            if current_schedule_name not in self.schedule["schedules"]:
+                self.schedule["schedules"][current_schedule_name] = {}
+
+            # 更新当前课表的数据
+            self.schedule["schedules"][current_schedule_name] = new_data
+            
+            # 保存到文件
+            self.save_schedule()
+            
+            # 重新加载并更新UI
+            self._initialize_schedule()
+            self._update_schedule_display(self.displayed_weekday)
+            
+            logger.log_info(f"成功从AI助手导入并更新了课表 '{current_schedule_name}'。")
+            
+        except Exception as e:
+            logger.log_error(f"导入课表数据时出错: {e}")
+            # 可以选择在这里弹出一个错误提示框
+            from tkinter import messagebox
+            messagebox.showerror("导入失败", f"保存课表时发生错误: {e}")
     
     def _initialize_ui(self) -> None:
         """初始化主界面"""
@@ -848,7 +882,7 @@ class CourseScheduler:
         """显示小工具窗口"""
         from tools_window import ToolsWindow
         if not hasattr(self, 'tools_window') or not self.tools_window.window.winfo_exists():
-            self.tools_window = ToolsWindow(self.root, self.config_handler)
+            self.tools_window = ToolsWindow(self.root, self.config_handler, self)
         self.tools_window.show()
 
     def start_background_update_check(self):

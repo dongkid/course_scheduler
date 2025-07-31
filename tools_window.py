@@ -4,15 +4,17 @@ from typing import Callable
 
 class ToolsWindow:
     """小工具窗口类"""
-    def __init__(self, root: tk.Tk, config_handler):
+    def __init__(self, root: tk.Tk, config_handler, main_app):
         """初始化小工具窗口
         
         Args:
             root: 主窗口
             config_handler: 配置处理器
+            main_app: 主应用实例
         """
         self.root = root
         self.config_handler = config_handler
+        self.main_app = main_app
         self.window = None
         self.style = ttk.Style()
         
@@ -28,7 +30,7 @@ class ToolsWindow:
         self.window = tk.Toplevel(self.root)
         self.window.title("小工具")
         self.window.resizable(False, False)
-        self.window.geometry("800x300")
+        self.window.geometry("800x200")
         self.window.configure(bg="white")
         
         # 配置样式
@@ -39,8 +41,8 @@ class ToolsWindow:
                            foreground="#2c3e50")
         self.style.configure("Subtitle.TLabel", font=("微软雅黑", 14),
                            foreground="#7f8c8d")
-        self.style.configure("TButton", font=("微软雅黑", 12), 
-                           padding=10, width=15)
+        self.style.configure("TButton", font=("微软雅黑", 12),
+                           padding=10)
         self.style.map("TButton",
                       foreground=[("active", "#ffffff")],
                       background=[("active", "#3498db")])
@@ -62,43 +64,28 @@ class ToolsWindow:
         
         # 添加按钮
         button_frame = ttk.Frame(main_frame)
-        button_frame.pack(pady=20)
-        
-        # 全屏大号时间按钮
-        fullscreen_time_btn = ttk.Button(
-            button_frame,
-            text="全屏大号时间",
-            command=self._show_fullscreen_time,
-            style="TButton"
-        )
-        fullscreen_time_btn.pack(side=tk.LEFT, padx=10, pady=5)
-        
-        # 天气按钮
-        weather_btn = ttk.Button(
-            button_frame,
-            text="天气",
-            command=self._show_weather,
-            style="TButton"
-        )
-        weather_btn.pack(side=tk.LEFT, padx=10, pady=5)
-        
-        # 数独按钮
-        sudoku_btn = ttk.Button(
-            button_frame,
-            text="数独",
-            command=self._show_sudoku,
-            style="TButton"
-        )
-        sudoku_btn.pack(side=tk.LEFT, padx=10, pady=5)
-        
-        # 未完待续按钮
-        todo_btn = ttk.Button(
-            button_frame,
-            text="未完待续",
-            command=self._show_todo,
-            style="TButton"
-        )
-        todo_btn.pack(side=tk.LEFT, padx=10, pady=5)
+        button_frame.pack(pady=20, expand=True, fill=tk.X)
+
+        buttons = {
+            "全屏大号时间": self._show_fullscreen_time,
+            "天气": self._show_weather,
+            "数独": self._show_sudoku,
+            "AI 助手": self._show_ai_assistant,
+            "未完待续": self._show_todo
+        }
+
+        # Configure grid columns to share space equally
+        for i in range(len(buttons)):
+            button_frame.grid_columnconfigure(i, weight=1)
+
+        for i, (text, command) in enumerate(buttons.items()):
+            btn = ttk.Button(
+                button_frame,
+                text=text,
+                command=command,
+                style="TButton"
+            )
+            btn.grid(row=0, column=i, padx=5, pady=5, sticky="ew")
         
     def _show_fullscreen_time(self):
         """显示全屏大号时间"""
@@ -121,3 +108,9 @@ class ToolsWindow:
         """显示数独游戏"""
         from tools.sudoku_ui import SudokuApp
         self.sudoku_window = SudokuApp(self.root)
+
+    def _show_ai_assistant(self):
+        """显示AI助手"""
+        from tools.ai_assistant import AIAssistantWindow
+        self.ai_assistant_window = AIAssistantWindow(self.main_app)
+        self.ai_assistant_window.show()

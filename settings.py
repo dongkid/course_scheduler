@@ -570,6 +570,25 @@ class SettingsWindow:
 
         self._on_provider_change() # 初始化显隐状态
 
+        # AI助手设置
+        ai_frame = ttk.LabelFrame(tools_frame, text="AI助手设置", style="TFrame")
+        ai_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        ttk.Label(ai_frame, text="Base URL:").grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
+        self.ai_base_url_entry = ttk.Entry(ai_frame, width=35)
+        self.ai_base_url_entry.grid(row=0, column=1, padx=5, pady=5, sticky=tk.W)
+        self.ai_base_url_entry.insert(0, self.main_app.config_handler.ai_assistant_base_url)
+
+        ttk.Label(ai_frame, text="API Key:").grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
+        self.ai_api_key_entry = ttk.Entry(ai_frame, width=35, show="*")
+        self.ai_api_key_entry.grid(row=1, column=1, padx=5, pady=5, sticky=tk.W)
+        self.ai_api_key_entry.insert(0, self.main_app.config_handler.ai_assistant_api_key)
+
+        ttk.Label(ai_frame, text="模型名称:").grid(row=2, column=0, padx=5, pady=5, sticky=tk.W)
+        self.ai_model_name_entry = ttk.Entry(ai_frame, width=35)
+        self.ai_model_name_entry.grid(row=2, column=1, padx=5, pady=5, sticky=tk.W)
+        self.ai_model_name_entry.insert(0, self.main_app.config_handler.ai_assistant_model_name)
+
     def _create_other_tab(self) -> None:
         """创建其他设置标签页"""
         scrollable_tab = ScrollableFrame(self.notebook)
@@ -895,6 +914,11 @@ class SettingsWindow:
             # 保存和风天气API Key
             self.main_app.config_handler.weather_api_provider = self.weather_provider_var.get()
             self.main_app.config_handler.heweather_api_key = self.heweather_key_entry.get()
+
+            # 保存AI助手设置
+            self.main_app.config_handler.ai_assistant_base_url = self.ai_base_url_entry.get()
+            self.main_app.config_handler.ai_assistant_api_key = self.ai_api_key_entry.get()
+            self.main_app.config_handler.ai_assistant_model_name = self.ai_model_name_entry.get()
             
             # 保存课表轮换设置
             self.main_app.config_handler.schedule_rotation_enabled = self.rotation_var.get()
@@ -1057,6 +1081,14 @@ class SettingsWindow:
         self.countdown_date_entry.insert(0, handler.countdown_date.strftime("%Y-%m-%d"))
         self.courses_text.delete("1.0", tk.END)
         self.courses_text.insert(tk.END, "\n".join(handler.default_courses))
+
+        # AI助手设置
+        self.ai_base_url_entry.delete(0, tk.END)
+        self.ai_base_url_entry.insert(0, handler.ai_assistant_base_url)
+        self.ai_api_key_entry.delete(0, tk.END)
+        self.ai_api_key_entry.insert(0, handler.ai_assistant_api_key)
+        self.ai_model_name_entry.delete(0, tk.END)
+        self.ai_model_name_entry.insert(0, handler.ai_assistant_model_name)
 
     def _on_provider_change(self):
         """根据选择的天气API提供商，显示或隐藏API Key输入框"""

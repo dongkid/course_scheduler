@@ -45,6 +45,9 @@ class ConfigHandler:
         self.last_weather_location = ""
         self.current_course_time_display_mode = "default"
         self.weather_api_provider = "heweather" # 新增天气API提供商配置
+        self.ai_assistant_base_url = ""
+        self.ai_assistant_api_key = ""
+        self.ai_assistant_model_name = "gemini-2.0-flash"
 
     def check_registry_auto_start(self):
         """检查注册表中是否存在开机自启动项"""
@@ -125,7 +128,10 @@ class ConfigHandler:
             "rotation_start_date": datetime.now().strftime("%Y-%m-%d"),
             "last_weather_location": "",
             "current_course_time_display_mode": "default",
-            "weather_api_provider": "heweather"
+            "weather_api_provider": "heweather",
+            "ai_assistant_base_url": "",
+            "ai_assistant_api_key": "",
+            "ai_assistant_model_name": "gemini-2.0-flash"
         }
         self.config = {
             "config_version": CONFIG_VERSION,
@@ -203,6 +209,9 @@ class ConfigHandler:
         self.last_weather_location = get_str("last_weather_location", "")
         self.current_course_time_display_mode = get_str("current_course_time_display_mode", "default")
         self.weather_api_provider = get_str("weather_api_provider", "heweather")
+        self.ai_assistant_base_url = get_str("ai_assistant_base_url", "")
+        self.ai_assistant_api_key = get_str("ai_assistant_api_key", "")
+        self.ai_assistant_model_name = get_str("ai_assistant_model_name", "gemini-2.0-flash")
 
     def save_config(self):
         """将当前实例属性保存到文件中对应的配置方案下"""
@@ -256,7 +265,10 @@ class ConfigHandler:
             "rotation_start_date": self.rotation_start_date.strftime("%Y-%m-%d"),
             "last_weather_location": self.last_weather_location,
             "current_course_time_display_mode": self.current_course_time_display_mode,
-            "weather_api_provider": self.weather_api_provider
+            "weather_api_provider": self.weather_api_provider,
+            "ai_assistant_base_url": self.ai_assistant_base_url,
+            "ai_assistant_api_key": self.ai_assistant_api_key,
+            "ai_assistant_model_name": self.ai_assistant_model_name
         })
         
         # 更新到主配置字典中

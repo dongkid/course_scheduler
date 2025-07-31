@@ -40,8 +40,8 @@ class MainMenu:
                            foreground="#2c3e50")
         self.style.configure("Subtitle.TLabel", font=("微软雅黑", 14),
                            foreground="#7f8c8d")
-        self.style.configure("TButton", font=("微软雅黑", 12), 
-                           padding=10, width=15)
+        self.style.configure("TButton", font=("微软雅黑", 12),
+                           padding=10)
         self.style.map("TButton",
                       foreground=[("active", "#ffffff")],
                       background=[("active", "#3498db")])
@@ -100,7 +100,3 @@ class MainMenu:
             style="Menu.TButton"
         )
         
-    def _show_tools_window(self):
-        """显示小工具窗口"""
-        from tools_window import ToolsWindow
-        ToolsWindow(self.root).show()
