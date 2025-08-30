@@ -41,7 +41,7 @@ class MainMenu:
         self.style.configure("Subtitle.TLabel", font=("微软雅黑", 14),
                            foreground="#7f8c8d")
         self.style.configure("TButton", font=("微软雅黑", 12),
-                           padding=10)
+                           padding=10, width=15)
         self.style.map("TButton",
                       foreground=[("active", "#ffffff")],
                       background=[("active", "#3498db")])
@@ -80,7 +80,7 @@ class MainMenu:
                 command=command,
                 style="TButton"
             )
-            btn.pack(side=tk.LEFT, padx=10, pady=5)
+            btn.pack(side=tk.LEFT, padx=5, pady=10, fill=tk.X, expand=True)
 
     def create_menu_button(self, parent: tk.Widget) -> ttk.Button:
         """创建主菜单按钮"""
