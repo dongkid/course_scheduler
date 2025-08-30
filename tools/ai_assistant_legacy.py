@@ -1,128 +1,18 @@
 import tkinter as tk
 from tkinter import scrolledtext, simpledialog, messagebox, filedialog
 from tkinter import ttk
-from tkwebview import TkWebview
 import threading
 import time
 import os
 import mimetypes
 import json
 from PIL import Image, ImageTk
-from tkwebview import TkWebview
-import markdown
-from mdx_math import MathExtension
+
 
 from tools import prompts
 
 
 class AIAssistantWindow:
-    CHAT_HTML_TEMPLATE = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <script src="https://cdn.bootcss.com/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-        <style>
-            body {
-                font-family: "微软雅黑", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-                line-height: 1.6;
-                margin: 0;
-                padding: 15px;
-                background-color: #fdfdfd;
-                overflow-wrap: break-word;
-            }
-            .message-container {
-                display: flex;
-                flex-direction: column;
-                align-items: flex-start;
-                margin-bottom: 15px;
-            }
-            .message-container.user {
-                align-items: flex-end;
-            }
-            .message-bubble {
-                max-width: 80%;
-                padding: 10px 15px;
-                border-radius: 18px;
-                color: #333;
-            }
-            .message-bubble.user {
-                background-color: #dcf8c6;
-            }
-            .message-bubble.gemini {
-                background-color: #f1f0f0;
-            }
-            .message-bubble.system {
-                background-color: #fff5c4;
-                font-style: italic;
-                color: #555;
-            }
-            .thought-container {
-                max-width: 80%;
-                margin-bottom: 5px;
-            }
-            .thought-header {
-                cursor: pointer;
-                font-size: 0.9em;
-                color: #666;
-                padding: 5px 10px;
-                border-radius: 10px;
-                background-color: #f0f0f0;
-                display: inline-block;
-            }
-            .thought-header:hover {
-                background-color: #e0e0e0;
-            }
-            .message-bubble.thought {
-                background-color: #f5f5f5;
-                font-size: 0.9em;
-                color: #444;
-                border: 1px solid #e0e0e0;
-            }
-            .role {
-                font-weight: bold;
-                font-size: 0.9em;
-                margin-bottom: 5px;
-                color: #555;
-            }
-            .message-container.user .role {
-                text-align: right;
-            }
-            pre {
-                background-color: #2d2d2d;
-                color: #f8f8f2;
-                padding: 1em;
-                border-radius: 5px;
-                overflow-x: auto;
-            }
-            code {
-                font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-            }
-            pre > code {
-                background-color: transparent;
-                padding: 0;
-                margin: 0;
-                font-size: 100%;
-                border-radius: 0;
-            }
-        </style>
-    </head>
-    <body>
-        <div id="chat-box"></div>
-        <script>
-            function scrollToBottom() {
-                window.scrollTo(0, document.body.scrollHeight);
-            }
-            function renderMath() {
-                if (window.MathJax) {
-                    MathJax.Hub.Queue(["Typeset", MathJax.Hub]);
-                }
-            }
-        </script>
-    </body>
-    </html>
-    """
-
     def __init__(self, main_app):
         self.main_app = main_app
         self.config_handler = main_app.config_handler
@@ -138,12 +28,7 @@ class AIAssistantWindow:
         self.image_photo_references = []
         self.genai = None
         self.types = None
-        self.message_counter = 0  # 用于生成唯一的HTML元素ID
-        self.current_thought_container_id = None
-        self.current_thought_bubble_id = None
-        self.current_stream_container_id = None
-        self.current_stream_bubble_id = None
-
+ 
         self._initialize_ui()
         self._setup_client()
         self._configure_styles()
@@ -204,9 +89,8 @@ class AIAssistantWindow:
         input_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
 
         # 对话显示区域
-        self.chat_display = TkWebview(ai_assistant_tab)
+        self.chat_display = scrolledtext.ScrolledText(ai_assistant_tab, wrap=tk.WORD, state='disabled', font=("微软雅黑", 12))
         self.chat_display.pack(expand=True, fill=tk.BOTH, padx=5, pady=5)
-        self.chat_display.set_html(self.CHAT_HTML_TEMPLATE)
 
         self.input_entry = ttk.Entry(input_frame, font=("微软雅黑", 12))
         self.input_entry.pack(side=tk.LEFT, expand=True, fill=tk.X, ipady=5)
@@ -333,46 +217,10 @@ class AIAssistantWindow:
         self._append_message("系统", f"❌ 初始化失败: {e}")
 
     def _append_message(self, role, text):
-        # 转换 Markdown 为 HTML
-        extensions = [
-            'markdown.extensions.extra',
-            'markdown.extensions.codehilite',
-            'markdown.extensions.tables',
-            'markdown.extensions.toc',
-            MathExtension(enable_dollar_delimiter=True)
-        ]
-        html_content = markdown.markdown(text, extensions=extensions)
-        
-        # 角色映射到 CSS 类
-        role_map = {
-            "You": "user",
-            "Gemini": "gemini",
-            "系统": "system"
-        }
-        role_class = role_map.get(role, "system")
-
-        # 创建唯一的元素 ID
-        self.message_counter += 1
-        container_id = f"msg-container-{self.message_counter}"
-        
-        # 构建 HTML 结构
-        message_html = f"""
-        <div id="{container_id}" class="message-container {role_class}">
-            <div class="role">{role}</div>
-            <div class="message-bubble {role_class}">
-                {html_content.replace('`', '\\`')}
-            </div>
-        </div>
-        """
-        
-        # 使用 JavaScript 将 HTML 添加到 chat-box 并滚动到底部
-        js_code = f"""
-        var chatBox = document.getElementById('chat-box');
-        chatBox.insertAdjacentHTML('beforeend', `{message_html}`);
-        scrollToBottom();
-        renderMath();
-        """
-        self.chat_display.eval(js_code)
+        self.chat_display.config(state='normal')
+        self.chat_display.insert(tk.END, f"{role}: {text}\n\n")
+        self.chat_display.config(state='disabled')
+        self.chat_display.yview(tk.END)
 
     def _on_send(self, event=None):
         user_input = self.input_entry.get()
@@ -386,7 +234,6 @@ class AIAssistantWindow:
         self.history.append(self.types.Content(role='user', parts=parts))
 
         self.send_button.config(state='disabled')
-        self.input_entry.config(state='disabled')
         threading.Thread(target=self._generate_response, daemon=True).start()
 
     def _ask_with_image(self):
@@ -427,7 +274,6 @@ class AIAssistantWindow:
             self.history.append(self.types.Content(role='user', parts=parts))
 
             self.send_button.config(state='disabled')
-            self.input_entry.config(state='disabled')
             threading.Thread(target=self._generate_response, daemon=True).start()
 
         except Exception as e:
@@ -436,156 +282,43 @@ class AIAssistantWindow:
     def _generate_response(self):
         try:
             model_name = self.config_handler.ai_assistant_model_name or 'gemini-1.5-flash'
-            config = self.types.GenerateContentConfig(
-                thinking_config=self.types.ThinkingConfig(
-                    include_thoughts=True
-                )
-            )
             response = self.client.models.generate_content_stream(
                 model=model_name,
-                contents=self.history,
-                config=config
+                contents=self.history
             )
             
             full_response_text = ""
-            full_thought_text = ""
-            is_thinking_started = False
-            is_answer_started = False
-
-            for chunk in response:
-                for part in chunk.candidates[0].content.parts:
-                    if not hasattr(part, 'text') or not part.text:
-                        continue
-                    
-                    if hasattr(part, 'thought') and part.thought:
-                        if not is_thinking_started:
-                            self.window.after(0, self._append_thought_streaming)
-                            is_thinking_started = True
-                        full_thought_text += part.text
-                        self.window.after(0, lambda t=part.text: self._update_streaming_message(t, is_thought=True))
-                    else:
-                        if not is_answer_started:
-                            self.window.after(0, lambda: self._append_message_streaming("Gemini", ""))
-                            is_answer_started = True
-                        full_response_text += part.text
-                        self.window.after(0, lambda t=part.text: self._update_streaming_message(t, is_thought=False))
-
-            if is_thinking_started:
-                self.window.after(0, lambda ft=full_thought_text: self._finalize_streaming_message(ft, is_thought=True))
+            self.window.after(0, lambda: self._append_message_streaming("Gemini", ""))
             
-            if is_answer_started:
-                self.window.after(0, lambda fr=full_response_text: self._finalize_streaming_message(fr, is_thought=False))
-                self.history.append(self.types.Content(role='model', parts=[self.types.Part.from_text(text=full_response_text)]))
-            elif is_thinking_started: # 如果模型只返回了思考过程
-                self.history.append(self.types.Content(role='model', parts=[self.types.Part.from_text(text=full_thought_text)]))
+            for chunk in response:
+                full_response_text += chunk.text
+                self.window.after(0, lambda t=chunk.text: self._update_streaming_message(t))
 
+            self.window.after(0, self._finalize_streaming_message)
+            self.history.append(self.types.Content(role='model', parts=[self.types.Part.from_text(text=full_response_text)]))
 
         except Exception as e:
-            self.window.after(0, lambda err=e: self._append_message("系统", f"❌ 请求出错: {err}"))
+            self.window.after(0, lambda: self._append_message("系统", f"❌ 请求出错: {e}"))
         finally:
-            def _reset_ui_and_state():
-                self.send_button.config(state='normal')
-                self.input_entry.config(state='normal')
-                self.current_thought_container_id = None
-                self.current_thought_bubble_id = None
-                self.current_stream_container_id = None
-                self.current_stream_bubble_id = None
-            self.window.after(10, _reset_ui_and_state) # 稍作延迟以确保finalize消息处理完毕
-
-    def _append_thought_streaming(self):
-        self.message_counter += 1
-        self.current_thought_container_id = f"thought-container-{self.message_counter}"
-        self.current_thought_bubble_id = f"thought-bubble-{self.message_counter}"
-
-        message_html = f"""
-        <div class="message-container gemini">
-            <details id="{self.current_thought_container_id}" class="thought-container" open>
-                <summary class="thought-header">模型思考过程...</summary>
-                <div id="{self.current_thought_bubble_id}" class="message-bubble thought"></div>
-            </details>
-        </div>
-        """
-        js_code = f"""
-        var chatBox = document.getElementById('chat-box');
-        chatBox.insertAdjacentHTML('beforeend', `{message_html}`);
-        scrollToBottom();
-        """
-        self.chat_display.eval(js_code)
+            self.window.after(0, lambda: self.send_button.config(state='normal'))
 
     def _append_message_streaming(self, role, text):
-        # 角色映射到 CSS 类
-        role_map = {"Gemini": "gemini", "系统": "system"}
-        role_class = role_map.get(role, "system")
+        self.chat_display.config(state='normal')
+        self.chat_display.insert(tk.END, f"{role}: {text}")
+        self.chat_display.config(state='disabled')
+        self.chat_display.yview(tk.END)
 
-        # 创建唯一的元素 ID
-        self.message_counter += 1
-        self.current_stream_container_id = f"msg-container-{self.message_counter}"
-        self.current_stream_bubble_id = f"msg-bubble-{self.message_counter}"
+    def _update_streaming_message(self, text_chunk):
+        self.chat_display.config(state='normal')
+        self.chat_display.insert(tk.END, text_chunk)
+        self.chat_display.config(state='disabled')
+        self.chat_display.yview(tk.END)
 
-        # 构建初始的 HTML 结构 (空的 bubble)
-        message_html = f"""
-        <div id="{self.current_stream_container_id}" class="message-container {role_class}">
-            <div class="role">{role}</div>
-            <div id="{self.current_stream_bubble_id}" class="message-bubble {role_class}"></div>
-        </div>
-        """
-        
-        # 使用 JavaScript 将 HTML 添加到 chat-box
-        js_code = f"""
-        var chatBox = document.getElementById('chat-box');
-        chatBox.insertAdjacentHTML('beforeend', `{message_html}`);
-        scrollToBottom();
-        renderMath();
-        """
-        self.chat_display.eval(js_code)
-
-    def _update_streaming_message(self, text_chunk, is_thought):
-        # 对文本进行转义，以防止破坏 JavaScript 字符串
-        escaped_chunk = text_chunk.replace('\\', '\\\\').replace('`', '\\`').replace('${', '\\${')
-        
-        bubble_id = self.current_thought_bubble_id if is_thought else self.current_stream_bubble_id
-        if not bubble_id: return
-
-        # 使用 JavaScript 更新 innerHTML
-        js_code = f"""
-        var bubble = document.getElementById('{bubble_id}');
-        if (bubble) {{
-            bubble.innerHTML += `{escaped_chunk}`;
-            scrollToBottom();
-            if (!{str(is_thought).lower()}) {{
-                renderMath();
-            }}
-        }}
-        """
-        self.chat_display.eval(js_code)
-
-    def _finalize_streaming_message(self, full_text, is_thought):
-        # 将完整的 Markdown 文本转换为 HTML
-        extensions = [
-            'markdown.extensions.extra', 'markdown.extensions.codehilite',
-            'markdown.extensions.tables', 'markdown.extensions.toc',
-            MathExtension(enable_dollar_delimiter=True)
-        ]
-        final_html = markdown.markdown(full_text, extensions=extensions)
-        
-        # 对 HTML 内容进行转义
-        escaped_html = final_html.replace('\\', '\\\\').replace('`', '\\`').replace('${', '\\${')
-
-        bubble_id = self.current_thought_bubble_id if is_thought else self.current_stream_bubble_id
-        if not bubble_id: return
-
-        # 使用 JavaScript 替换整个 bubble 的内容
-        js_code = f"""
-        var bubble = document.getElementById('{bubble_id}');
-        if (bubble) {{
-            bubble.innerHTML = `{escaped_html}`;
-            scrollToBottom();
-            if (!{str(is_thought).lower()}) {{
-                renderMath();
-            }}
-        }}
-        """
-        self.chat_display.eval(js_code)
+    def _finalize_streaming_message(self):
+        self.chat_display.config(state='normal')
+        self.chat_display.insert(tk.END, "\n\n")
+        self.chat_display.config(state='disabled')
+        self.chat_display.yview(tk.END)
 
     def _on_mousewheel(self, event):
         # 仅当鼠标在图片预览区域内时才滚动
