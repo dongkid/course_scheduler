@@ -32,7 +32,8 @@ jobs:
 
     - name: Build with Python
       run: |
-        pyinstaller --onefile --name=course_scheduler --windowed --clean --noconfirm --icon=res/icon.ico --add-data "res/icon.png;res" --add-data "res/icon.ico;res" --add-data ".venv\Lib\site-packages\tkwebview\platform;tkwebview\platform" main.py
+        $TKWEBVIEW_PATH = python -c "import os, tkwebview; print(os.path.join(os.path.dirname(tkwebview.__file__), 'platform'))"
+        pyinstaller --onefile --name=course_scheduler --windowed --clean --noconfirm --icon=res/icon.ico --add-data "res/icon.png;res" --add-data "res/icon.ico;res" --add-data "$TKWEBVIEW_PATH;tkwebview\platform" main.py
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
