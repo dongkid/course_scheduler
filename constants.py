@@ -12,7 +12,7 @@ VERSION_PATTERN = r"^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$"
 # 程序信息
 APP_NAME = "桌面课程表 - Course Scheduler"
 AUTHOR = "dong"
-VERSION = "1.0.0-preview"
+VERSION = "1.0.0-preview1"
 CONFIG_VERSION = "2"
 PROJECT_URL = "https://github.com/dongkid/course_scheduler"
 
