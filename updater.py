@@ -16,7 +16,7 @@ import socket
 
 # --- Constants for Multi-threaded Download ---
 CHUNK_SIZE = 512 * 1024  # 512KB per chunk for fine-grained task queue
-MAX_THREADS = 16  # Max number of download threads
+MAX_THREADS = 32  # Max number of download threads
 DOWNLOAD_RETRY = 2 # Retries for a single chunk
 
 class Updater:
@@ -234,45 +234,55 @@ class Updater:
         while not self._stop_event.is_set():
             try:
                 task = self.task_queue.get_nowait()
-            except Exception: # Queue Empty
-                break # 队列为空，线程退出
+            except Exception:  # Queue Empty
+                break  # 队列为空，线程退出
 
-            part_path, start_byte, end_byte, retries = task
-            
+            # 将任务处理逻辑包裹在 try...finally 中，确保 task_done() 总被调用
             try:
-                headers = {'Range': f'bytes={start_byte}-{end_byte}'}
-                response = requests.get(url, headers=headers, stream=True, timeout=30)
-                response.raise_for_status()
+                part_path, start_byte, end_byte, retries = task
 
-                with open(part_path, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        if self._stop_event.is_set():
-                            # 如果任务被中断，将其放回队列以便其他线程可以处理
-                            self.task_queue.put(task)
-                            return
-                        
-                        f.write(chunk)
+                try:
+                    headers = {'Range': f'bytes={start_byte}-{end_byte}'}
+                    response = requests.get(url, headers=headers, stream=True, timeout=30)
+                    response.raise_for_status()
+
+                    with open(part_path, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            if self._stop_event.is_set():
+                                self.task_queue.put(task)
+                                return  # 退出线程，任务已放回队列
+
+                            f.write(chunk)
+                            with self.shared_progress["lock"]:
+                                self.shared_progress["downloaded_bytes"] += len(chunk)
+                    
+                    # 下载成功，无需重新排队
+
+                except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+                    if self._stop_event.is_set():
+                        self.task_queue.put(task)
+                        return
+
+                    logger.log_warning(f"下载块 {part_path} 遇到网络问题 ({type(e).__name__})，将在 {self.retry_delay} 秒后重试。")
+                    time.sleep(self.retry_delay)
+                    self.task_queue.put(task)  # 重新排队以无限重试
+
+                except Exception as e:
+                    if self._stop_event.is_set():
+                        self.task_queue.put(task)
+                        return
+
+                    logger.log_warning(f"下载块 {part_path} 失败: {e}。剩余重试次数: {retries}")
+                    if retries > 0:
+                        new_task = (part_path, start_byte, end_byte, retries - 1)
+                        self.task_queue.put(new_task)  # 重新排队，重试次数减1
+                    else:
+                        logger.error(f"块 {part_path} 在所有重试后仍然失败。")
                         with self.shared_progress["lock"]:
-                            self.shared_progress["downloaded_bytes"] += len(chunk)
-                
+                            self.shared_progress["error"] = e
+            finally:
+                # 关键：无论结果如何都标记任务完成，以防止 queue.join() 永久阻塞
                 self.task_queue.task_done()
-
-            except Exception as e:
-                if self._stop_event.is_set():
-                    self.task_queue.put(task) # 中断时放回任务
-                    return
-
-                logger.log_warning(f"下载块 {part_path} 失败: {e}。剩余重试次数: {retries}")
-                if retries > 0:
-                    # 失败，重新放入队列
-                    task = (part_path, start_byte, end_byte, retries - 1)
-                    self.task_queue.put(task)
-                else:
-                    logger.error(f"块 {part_path} 在所有重试后仍然失败。")
-                    with self.shared_progress["lock"]:
-                        self.shared_progress["error"] = e
-                    # 即使一个块失败，也标记为完成以避免死锁
-                    self.task_queue.task_done()
                 
     def _combine_files(self, destination_path: str):
         """将下载的分块合并成一个文件。"""
