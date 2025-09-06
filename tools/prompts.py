@@ -26,3 +26,14 @@ Example:
   "6": []
 }
 """
+CURRENT_SCHEDULE_CONTEXT_PROMPT = """
+
+Here is the user's current schedule data for your reference:
+```json
+{current_schedule_json}
+```
+
+Please use this data as a reference to improve the accuracy of your recognition.
+If the image is blurry or some information is missing, you can infer it based on the current schedule.
+However, the information in the image still takes precedence. Your final output should be a complete and accurate schedule based on the image.
+"""

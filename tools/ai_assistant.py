@@ -237,6 +237,16 @@ class AIAssistantWindow:
         self.import_schedule_button = ttk.Button(action_frame, text="导入到课表", state='disabled', command=self._import_schedule)
         self.import_schedule_button.pack(side=tk.LEFT, padx=5)
 
+        # 添加一个复选框用于选择是否发送当前课表
+        self.send_current_schedule_var = tk.BooleanVar(value=True)
+        self.send_current_schedule_check = ttk.Checkbutton(
+            action_frame,
+            text="将当前课表作为参考",
+            variable=self.send_current_schedule_var,
+            style="White.TCheckbutton"
+        )
+        self.send_current_schedule_check.pack(side=tk.LEFT, padx=10)
+
         # 主内容区 (图片预览 + 结果显示)
         content_frame = ttk.Frame(schedule_parser_tab, style="TFrame")
         content_frame.pack(expand=True, fill=tk.BOTH, padx=5, pady=5)
@@ -669,8 +679,27 @@ class AIAssistantWindow:
 
     def _perform_recognition(self, additional_prompt=""):
         try:
-            # 组合基础提示和用户输入的补充提示
+            # 准备基础提示
             final_prompt = prompts.SCHEDULE_RECOGNITION_PROMPT
+
+            # 如果用户选择发送当前课表，则获取并附加
+            if self.send_current_schedule_var.get():
+                try:
+                    current_schedule_name = self.main_app.schedule.get("current_schedule", "default")
+                    current_courses = self.main_app.schedule.get("schedules", {}).get(current_schedule_name, {})
+                    if current_courses:
+                        # 将当前课表数据格式化为JSON字符串
+                        current_schedule_json = json.dumps(current_courses, indent=2, ensure_ascii=False)
+                        # 附加到提示中
+                        final_prompt += prompts.CURRENT_SCHEDULE_CONTEXT_PROMPT.format(
+                            current_schedule_json=current_schedule_json
+                        )
+                except Exception as e:
+                    # 如果获取课表失败，在UI上给出提示，但不中断流程
+                    self.window.after(0, lambda: self.status_label.config(text=f"获取当前课表失败: {e}"))
+
+
+            # 组合用户输入的补充提示
             if additional_prompt:
                 final_prompt += "\n\n" + "用户的补充说明如下，请务必遵从：\n" + additional_prompt
 
