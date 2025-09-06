@@ -65,6 +65,7 @@ class CourseScheduler:
             self.displayed_weekday = datetime.now().weekday()  # 当前显示的星期，0-6
             self.view_reset_timer = None  # 视图自动重置计时器
             self.swipe_start_x = 0  # 滑动起始x坐标
+            self.is_view_locked = False # 视图是否被锁定
             # -------------------------
             
             logger.log_debug("Initializing schedule")
@@ -240,6 +241,7 @@ class CourseScheduler:
         self._create_time_display()
         self._create_countdown_display()
         self._create_schedule_display()
+        self._create_preview_icons() # 创建预览状态图标
         
         # 创建主菜单按钮容器
         self.button_frame = tk.Frame(self.root)
@@ -389,6 +391,33 @@ class CourseScheduler:
                                fill=tk.BOTH, expand=True)
         self._bind_schedule_events()
 
+    def _create_preview_icons(self) -> None:
+        """创建预览状态图标"""
+        # 使用一种通用字体来显示表情符号
+        emoji_font = ("Segoe UI Emoji", 12)
+        # 获取schedule_frame的背景色，以便图标融合
+        bg_color = self.schedule_frame.cget('bg')
+        
+        self.preview_eye_icon = tk.Label(self.schedule_frame, text="👁️", font=emoji_font, bg=bg_color)
+        self.preview_lock_icon = tk.Label(self.schedule_frame, text="🔒", font=emoji_font, bg=bg_color)
+
+    def _update_preview_icons(self) -> None:
+        """更新右下角预览状态图标的可见性"""
+        is_previewing = self.displayed_weekday != datetime.now().weekday()
+        
+        # 调整图标位置和间距
+        if is_previewing:
+            # 眼睛图标现在在最右侧
+            self.preview_eye_icon.place(relx=1.0, rely=1.0, x=-10, y=-10, anchor='se')
+        else:
+            self.preview_eye_icon.place_forget()
+
+        if is_previewing and self.is_view_locked:
+            # 锁图标在眼睛图标的左边
+            self.preview_lock_icon.place(relx=1.0, rely=1.0, x=-35, y=-10, anchor='se')
+        else:
+            self.preview_lock_icon.place_forget()
+
     def _start_update_loop(self) -> None:
         """启动界面更新循环"""
         self.timer_ids = []  # 存储定时器ID
@@ -503,6 +532,9 @@ class CourseScheduler:
         
         # 移除多余的标签
         self._remove_extra_labels(schedule_for_day)
+
+        # 更新预览图标状态
+        self._update_preview_icons()
 
     def _update_course_labels(self, now: datetime, schedule: List[Dict[str, str]]) -> None:
         """更新或创建课程标签"""
@@ -737,31 +769,20 @@ class CourseScheduler:
             self.swipe_start_x = 0 # 重置起始位置，防止一次长滑动触发多次
 
     def _on_schedule_double_click(self, event):
-        """处理课表区域的双击事件，立即重置视图"""
-        self._reset_schedule_view_to_today()
-
-    def _handle_swipe(self, direction: str):
-        """处理滑动逻辑，切换显示的星期"""
-        if direction == 'left':
-            self.displayed_weekday = (self.displayed_weekday + 1) % 7
-        else:
-            self.displayed_weekday = (self.displayed_weekday - 1 + 7) % 7
-        
-        self._update_schedule_display(self.displayed_weekday)
-        self._start_view_reset_timer()
-
-    def _start_view_reset_timer(self):
-        """启动一个计时器，在5秒后将视图重置回当天"""
-        # 如果已有计时器，先取消
-        if self.view_reset_timer:
-            self.root.after_cancel(self.view_reset_timer)
-        
-        # 启动新的5秒计时器
-        self.view_reset_timer = self.root.after(5000, self._reset_schedule_view_to_today)
-
-    def _on_schedule_double_click(self, event):
-        """处理课表区域的双击事件，立即重置视图"""
-        self._reset_schedule_view_to_today()
+        """处理课表区域的双击事件。在预览时锁定/解锁视图。"""
+        # 只有在预览其他天时双击才有效
+        if self.displayed_weekday != datetime.now().weekday():
+            self.is_view_locked = not self.is_view_locked # 切换锁定状态
+            if self.is_view_locked:
+                # 如果锁定，取消自动重置计时器
+                if self.view_reset_timer:
+                    self.root.after_cancel(self.view_reset_timer)
+                    self.view_reset_timer = None
+            else:
+                # 如果解锁，启动自动重置计时器
+                self._start_view_reset_timer()
+            
+            self._update_preview_icons() # 更新图标显示
 
     def _on_schedule_triple_click(self, event):
         """处理课表区域的三击事件，开关周课表预览"""
@@ -784,7 +805,20 @@ class CourseScheduler:
             self.displayed_weekday = (self.displayed_weekday - 1 + 7) % 7
         
         self._update_schedule_display(self.displayed_weekday)
-        self._start_view_reset_timer()
+        self._start_view_reset_timer() # 尝试启动计时器（如果未锁定）
+
+    def _start_view_reset_timer(self):
+        """启动一个计时器，在5秒后将视图重置回当天"""
+        # 如果视图被锁定，则不启动计时器
+        if self.is_view_locked:
+            return
+            
+        # 如果已有计时器，先取消
+        if self.view_reset_timer:
+            self.root.after_cancel(self.view_reset_timer)
+        
+        # 启动新的5秒计时器
+        self.view_reset_timer = self.root.after(5000, self._reset_schedule_view_to_today)
 
     def _start_view_reset_timer(self):
         """启动一个计时器，在5秒后将视图重置回当天"""
@@ -798,10 +832,14 @@ class CourseScheduler:
     def _reset_schedule_view_to_today(self):
         """将课表视图重置为显示当天的课程"""
         self.view_reset_timer = None
+        self.is_view_locked = False # 重置时解除锁定
         today_weekday = datetime.now().weekday()
         if self.displayed_weekday != today_weekday:
             self.displayed_weekday = today_weekday
             self._update_schedule_display(self.displayed_weekday)
+        else:
+            # 即使已经在当天，也要确保图标状态正确
+            self._update_preview_icons()
 
 
     def _remove_extra_labels(self, schedule: List[Dict[str, str]]) -> None:
