@@ -3,10 +3,12 @@ from auto_start import check_and_generate_files
 from logger import logger
 from restart_manager import RestartManager
 from constants import RESOLUTION_PRESETS, STRING_TO_RESOLUTION_KEY
+from config_handler import ConfigHandler
 import socket
 import tkinter as tk
 import sys
 import multiprocessing
+import ctypes
 
 if __name__ == "__main__":
     
@@ -82,7 +84,28 @@ if __name__ == "__main__":
             else:
                 geometry_override = args.geometry
             
-    app = CourseScheduler(startup_action=startup_action, geometry_override=geometry_override)
+    # 提前初始化配置处理器
+    config_handler = ConfigHandler()
+
+    # 根据配置启用DPI感知 (在创建任何窗口之前)
+    if sys.platform == "win32" and config_handler.experimental_dpi_awareness:
+        try:
+            # 适用于 Windows 8.1 及以上版本
+            ctypes.windll.shcore.SetProcessDpiAwareness(1)
+            logger.log_info("已启用实验性DPI感知功能。")
+        except (AttributeError, OSError):
+            try:
+                # 适用于 Windows Vista 及以上版本
+                ctypes.windll.user32.SetProcessDPIAware()
+                logger.log_info("已启用实验性DPI感知功能 (兼容模式)。")
+            except (AttributeError, OSError):
+                logger.log_warning("无法设置DPI感知，可能在高分屏上显示模糊。")
+
+    app = CourseScheduler(
+        config_handler=config_handler,
+        startup_action=startup_action,
+        geometry_override=geometry_override
+    )
     
     # 清理可能存在的临时重启资源
     RestartManager.cleanup_restart_manager_resources()

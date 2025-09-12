@@ -93,11 +93,17 @@ class SettingsWindow:
                            foreground="#2c3e50")
         self.style.configure("Subtitle.TLabel", font=("微软雅黑", 14),
                            foreground="#7f8c8d")
-        self.style.configure("TButton", font=("微软雅黑", 12), 
+        self.style.configure("TButton", font=("微软雅黑", 12),
                            padding=10, width=15)
         self.style.map("TButton",
                       foreground=[("active", "#ffffff")],
                       background=[("active", "#3498db")])
+        
+        # 为DPI感知模式定义一个特殊的按钮样式
+        if self.main_app.config_handler.experimental_dpi_awareness:
+            self.style.configure("DPI.TButton", font=("微软雅黑", 14), padding=12, width=15)
+        else:
+            self.style.configure("DPI.TButton", font=("微软雅黑", 12), padding=10, width=15)
         
         return window
 
@@ -152,14 +158,14 @@ class SettingsWindow:
             button_frame,
             text="应用",
             command=self.apply_settings,
-            style="TButton"
+            style="DPI.TButton"
         ).pack(side=tk.LEFT, padx=5, pady=10, fill=tk.X, expand=True)
         
         ttk.Button(
             button_frame,
             text="重启程序",
             command=self.restart_ui,
-            style="TButton"
+            style="DPI.TButton"
         ).pack(side=tk.LEFT, padx=5, pady=10, fill=tk.X, expand=True)
     
     def _create_config_selector(self, parent):
@@ -637,6 +643,17 @@ class SettingsWindow:
         self.log_retention_days_entry.grid(row=0, column=1, padx=5, pady=5)
         self.log_retention_days_entry.insert(0, str(self.main_app.config_handler.log_retention_days))
 
+        # 实验性功能
+        experimental_frame = ttk.LabelFrame(other_frame, text="实验性功能", style="TFrame")
+        experimental_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        self.dpi_awareness_var = tk.BooleanVar(value=self.main_app.config_handler.experimental_dpi_awareness)
+        self.dpi_awareness_check = ttk.Checkbutton(
+            experimental_frame, text="启用实验性DPI感知 (需要重启)",
+            variable=self.dpi_awareness_var,
+            style="White.TCheckbutton")
+        self.dpi_awareness_check.pack(side=tk.LEFT, padx=5)
+
     def _create_backup_restore_tab(self) -> None:
         """创建备份与还原标签页"""
         scrollable_tab = ScrollableFrame(self.notebook)
@@ -796,7 +813,8 @@ class SettingsWindow:
             'countdown_size': self.main_app.config_handler.countdown_size,
             'schedule_size': self.main_app.config_handler.schedule_size,
             'font_size': self.main_app.config_handler.font_size,
-            'font_color': self.main_app.config_handler.font_color
+            'font_color': self.main_app.config_handler.font_color,
+            'experimental_dpi_awareness': self.main_app.config_handler.experimental_dpi_awareness
         }
         
         try:
@@ -954,6 +972,9 @@ class SettingsWindow:
                 messagebox.showerror("错误", "请输入有效的日志保留天数（正整数）")
                 return
             
+            # 应用DPI感知设置
+            self.main_app.config_handler.experimental_dpi_awareness = self.dpi_awareness_var.get()
+            
             self.main_app.config_handler.save_config()
             # 更新字体设置
             self.main_app._update_font_settings()
@@ -966,7 +987,8 @@ class SettingsWindow:
                 'countdown_size': self.main_app.config_handler.countdown_size,
                 'schedule_size': self.main_app.config_handler.schedule_size,
                 'font_size': self.main_app.config_handler.font_size,
-                'font_color': self.main_app.config_handler.font_color
+                'font_color': self.main_app.config_handler.font_color,
+                'experimental_dpi_awareness': self.main_app.config_handler.experimental_dpi_awareness
             }
             
             if new_layout != old_layout:
@@ -1089,6 +1111,14 @@ class SettingsWindow:
         self.ai_api_key_entry.insert(0, handler.ai_assistant_api_key)
         self.ai_model_name_entry.delete(0, tk.END)
         self.ai_model_name_entry.insert(0, handler.ai_assistant_model_name)
+
+        # 其他设置
+        self.auto_start_var.set(handler.auto_start)
+        self.debug_var.set(handler.debug_mode)
+        self.auto_update_check_var.set(handler.auto_update_check_enabled)
+        self.log_retention_days_entry.delete(0, tk.END)
+        self.log_retention_days_entry.insert(0, str(handler.log_retention_days))
+        self.dpi_awareness_var.set(handler.experimental_dpi_awareness)
 
     def _on_provider_change(self):
         """根据选择的天气API提供商，显示或隐藏API Key输入框"""

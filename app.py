@@ -13,12 +13,14 @@ from main_menu import MainMenu
 
 class CourseScheduler:
     """课程表主应用类"""
-    def __init__(self, startup_action=None, geometry_override=None):
+    def __init__(self, config_handler, startup_action=None, geometry_override=None):
         """初始化课程表应用
         Args:
+            config_handler: 已初始化的配置处理器
             startup_action: 启动时要执行的动作
             geometry_override: 覆盖窗口几何设置
         """
+        self.config_handler = config_handler
         self.startup_action = startup_action
         self.updater = None # 初始化为None
         self.last_second = -1  # 记录上次更新的秒数
@@ -29,10 +31,6 @@ class CourseScheduler:
         self._course_time_cache = {}
         try:
             logger.log_debug("Initializing CourseScheduler application")
-            # 先初始化配置
-            self.config_handler = ConfigHandler()
-            logger.log_debug("ConfigHandler initialized")
-            self.config_handler.initialize_config()
             
             # 现在使用加载的配置来初始化日志记录器
             logger.setup(self.config_handler)
@@ -250,6 +248,7 @@ class CourseScheduler:
         # 初始化主菜单
         self.main_menu = MainMenu(
             self.root,
+            self.config_handler,
             {
                 "编辑课表": self.open_editor,
                 "小工具": self._show_tools_window,
@@ -623,7 +622,8 @@ class CourseScheduler:
         if hasattr(label, 'status_canvas'):
             # 缓存字体大小计算
             if not hasattr(label, 'cached_circle_size'):
-                label.cached_circle_size = int(self.config_handler.schedule_size * 1.2)
+                scale_factor = 1.8 if self.config_handler.experimental_dpi_awareness else 1.2
+                label.cached_circle_size = int(self.config_handler.schedule_size * scale_factor)
             
             circle_size = label.cached_circle_size
             label.status_canvas.config(width=circle_size, height=circle_size)
@@ -648,7 +648,8 @@ class CourseScheduler:
         if hasattr(self, 'course_labels'):
             for label in self.course_labels:
                 if hasattr(label, 'status_canvas'):
-                    circle_size = int(self.config_handler.schedule_size * 1.2)
+                    scale_factor = 1.8 if self.config_handler.experimental_dpi_awareness else 1.2
+                    circle_size = int(self.config_handler.schedule_size * scale_factor)
                     label.status_canvas.config(width=circle_size, height=circle_size)
                     label.status_canvas.coords(label.status_canvas.oval_id, 0, 0, circle_size, circle_size)
         
@@ -715,7 +716,8 @@ class CourseScheduler:
         label.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
         # 根据字体大小计算色块尺寸
-        circle_size = int(self.config_handler.schedule_size * 1.2)
+        scale_factor = 1.8 if self.config_handler.experimental_dpi_awareness else 1.2
+        circle_size = int(self.config_handler.schedule_size * scale_factor)
         status_canvas = tk.Canvas(
             course_frame,
             width=circle_size,

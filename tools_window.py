@@ -30,7 +30,10 @@ class ToolsWindow:
         self.window = tk.Toplevel(self.root)
         self.window.title("小工具")
         self.window.resizable(False, False)
-        self.window.geometry("800x200")
+        if self.config_handler.experimental_dpi_awareness:
+            self.window.geometry("1000x300") # 增加高度
+        else:
+            self.window.geometry("800x200")
         self.window.configure(bg="white")
         
         # 配置样式
@@ -42,7 +45,7 @@ class ToolsWindow:
         self.style.configure("Subtitle.TLabel", font=("微软雅黑", 14),
                            foreground="#7f8c8d")
         self.style.configure("TButton", font=("微软雅黑", 12),
-                           padding=10)
+                           padding=10, width=10)
         self.style.map("TButton",
                       foreground=[("active", "#ffffff")],
                       background=[("active", "#3498db")])

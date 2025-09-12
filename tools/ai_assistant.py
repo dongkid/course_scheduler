@@ -128,7 +128,10 @@ class AIAssistantWindow:
         self.config_handler = main_app.config_handler
         self.window = tk.Toplevel(main_app.root)
         self.window.title("AI 助手")
-        self.window.geometry("800x600")
+        if self.config_handler.experimental_dpi_awareness:
+            self.window.geometry("1000x800") # 宽高按比例放大
+        else:
+            self.window.geometry("800x600")
         self.window.configure(bg="white")
 
         self.history = []

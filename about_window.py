@@ -31,10 +31,13 @@ class AboutWindow:
         """创建并配置关于窗口"""
         window = tk.Toplevel(self.parent)
         window.title("关于")
-        window.geometry("500x200")
-        window.minsize(500, 200)
-        window.maxsize(600, 240)  # 设置窗口最大大小
         window.configure(bg="white")
+
+        if not self.app.config_handler.experimental_dpi_awareness:
+            window.geometry("500x200")
+            window.minsize(500, 200)
+            window.maxsize(600, 240)
+
         return window
 
     def _start_updater_preload(self):
@@ -64,8 +67,16 @@ class AboutWindow:
 
     def _initialize_ui(self) -> None:
         """初始化关于界面"""
-        # 绑定窗口大小变化事件
-        self.window.bind("<Configure>", self._update_font_size)
+        if self.app.config_handler.experimental_dpi_awareness:
+            # DPI模式下使用静态字体
+            style = ttk.Style()
+            title_size, base_size, url_size = 16, 12, 10
+            style.configure("AboutWindow.Title.TLabel", font=("Microsoft YaHei", title_size, "bold"))
+            style.configure("AboutWindow.TLabel", font=("Microsoft YaHei", base_size))
+            style.configure("AboutWindow.Url.TLabel", font=("Microsoft YaHei", url_size, "underline"), foreground="blue")
+        else:
+            # 普通模式下绑定动态字体调整
+            self.window.bind("<Configure>", self._update_font_size)
         
         # 主容器
         main_frame = ttk.Frame(self.window, style="AboutWindow.TFrame")

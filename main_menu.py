@@ -5,14 +5,16 @@ from constants import VERSION
 
 class MainMenu:
     """主菜单类"""
-    def __init__(self, root: tk.Tk, button_commands: dict[str, Callable]):
+    def __init__(self, root: tk.Tk, config_handler, button_commands: dict[str, Callable]):
         """初始化主菜单
         
         Args:
             root: 主窗口
+            config_handler: 配置处理器
             button_commands: 按钮命令字典，格式为{"按钮文本": 回调函数}
         """
         self.root = root
+        self.config_handler = config_handler
         self.button_commands = button_commands
         self.menu_window = None
         self.style = ttk.Style()
@@ -29,7 +31,10 @@ class MainMenu:
         self.menu_window = tk.Toplevel(self.root)
         self.menu_window.title("主菜单")
         self.menu_window.resizable(False, False)
-        self.menu_window.geometry("1200x300")
+        if self.config_handler.experimental_dpi_awareness:
+            self.menu_window.geometry("1400x350")
+        else:
+            self.menu_window.geometry("1200x300")
         self.menu_window.configure(bg="white")
         
         # 配置样式

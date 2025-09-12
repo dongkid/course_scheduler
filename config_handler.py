@@ -48,6 +48,7 @@ class ConfigHandler:
         self.ai_assistant_base_url = ""
         self.ai_assistant_api_key = ""
         self.ai_assistant_model_name = "gemini-2.0-flash"
+        self.experimental_dpi_awareness = False
 
     def check_registry_auto_start(self):
         """检查注册表中是否存在开机自启动项"""
@@ -131,7 +132,8 @@ class ConfigHandler:
             "weather_api_provider": "heweather",
             "ai_assistant_base_url": "",
             "ai_assistant_api_key": "",
-            "ai_assistant_model_name": "gemini-2.0-flash"
+            "ai_assistant_model_name": "gemini-2.0-flash",
+            "experimental_dpi_awareness": False
         }
         self.config = {
             "config_version": CONFIG_VERSION,
@@ -212,6 +214,7 @@ class ConfigHandler:
         self.ai_assistant_base_url = get_str("ai_assistant_base_url", "")
         self.ai_assistant_api_key = get_str("ai_assistant_api_key", "")
         self.ai_assistant_model_name = get_str("ai_assistant_model_name", "gemini-2.0-flash")
+        self.experimental_dpi_awareness = get_bool("experimental_dpi_awareness", False)
 
     def save_config(self):
         """将当前实例属性保存到文件中对应的配置方案下"""
@@ -268,7 +271,8 @@ class ConfigHandler:
             "weather_api_provider": self.weather_api_provider,
             "ai_assistant_base_url": self.ai_assistant_base_url,
             "ai_assistant_api_key": self.ai_assistant_api_key,
-            "ai_assistant_model_name": self.ai_assistant_model_name
+            "ai_assistant_model_name": self.ai_assistant_model_name,
+            "experimental_dpi_awareness": self.experimental_dpi_awareness
         })
         
         # 更新到主配置字典中
