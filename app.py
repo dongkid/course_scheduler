@@ -297,41 +297,15 @@ class CourseScheduler:
         from tkinter import messagebox
         from tools.fullscreen_time import FullscreenTimeWindow
         from tools.weather_ui import WeatherUI
-        from tools.weather import WeatherAPI, WeatherTool
-        
-        # 点击计数器
-        if not hasattr(self, '_click_count'):
-            self._click_count = 0
-        self._click_count += 1
-        
-        # 重置计数器定时器
-        if hasattr(self, '_click_timer'):
-            self.root.after_cancel(self._click_timer)
-        self._click_timer = self.root.after(500, self._reset_click_count)
+        from tools.weather import WeatherTool
         
         # 处理点击逻辑
-        if self._click_count == 1:
-            # 单次点击显示迷你天气
-            # 检查API密钥是否存在
-            if self.config_handler.heweather_api_key:
-                # 使用WeatherTool来获取或创建迷你天气界面
-                if not hasattr(self, "weather_tool"):
-                    self.weather_tool = WeatherTool()
-                # 获取迷你天气界面（如果已存在会重用）
-                self.weather_tool.get_mini_ui(master=self.root)
-        elif self._click_count >= 3:
-            # 三次点击显示全屏时间
-            self._click_count = 0
-            if messagebox.askyesno("确认", "是否打开全屏大号时间？"):
-                if not hasattr(self, "fullscreen_time_window"):
-                    from tools.fullscreen_time import FullscreenTimeWindow
-                    self.fullscreen_time_window = FullscreenTimeWindow(self.root, self.config_handler)
-                self.fullscreen_time_window.show()
+        if messagebox.askyesno("确认", "是否打开全屏大号时间？"):
+            if not hasattr(self, "fullscreen_time_window"):
+                from tools.fullscreen_time import FullscreenTimeWindow
+                self.fullscreen_time_window = FullscreenTimeWindow(self.root, self.config_handler)
+            self.fullscreen_time_window.show()
 
-    def _reset_click_count(self):
-        """重置点击计数器"""
-        self._click_count = 0
-        
     def _show_click_tooltip(self, event):
         """显示点击提示气泡"""
         # 创建气泡窗口
@@ -412,8 +386,10 @@ class CourseScheduler:
             self.preview_eye_icon.place_forget()
 
         if is_previewing and self.is_view_locked:
+            # 根据DPI感知模式调整锁图标的间距
+            lock_icon_x_offset = -45 if self.config_handler.experimental_dpi_awareness else -35
             # 锁图标在眼睛图标的左边
-            self.preview_lock_icon.place(relx=1.0, rely=1.0, x=-35, y=-10, anchor='se')
+            self.preview_lock_icon.place(relx=1.0, rely=1.0, x=lock_icon_x_offset, y=-10, anchor='se')
         else:
             self.preview_lock_icon.place_forget()
 

@@ -28,7 +28,16 @@ if __name__ == "__main__":
                        help='启动时打开主菜单')
     parser.add_argument('--geometry', type=str, default=None,
                        help='设置窗口的几何属性 (例如 "1080p" 或 "宽x高+X+Y")')
+    parser.add_argument('--force-dpi', action='store_true',
+                       help='强制使用DPI感知模式启动')
+    parser.add_argument('help', nargs='?', default=False,
+                       help='显示帮助信息')
     args = parser.parse_args()
+
+    # 处理 help 参数
+    if args.help:
+        parser.print_help()
+        sys.exit(0)
 
     # 单实例检查
     try:
@@ -87,17 +96,23 @@ if __name__ == "__main__":
     # 提前初始化配置处理器
     config_handler = ConfigHandler()
 
-    # 根据配置启用DPI感知 (在创建任何窗口之前)
-    if sys.platform == "win32" and config_handler.experimental_dpi_awareness:
+    # 根据配置或命令行参数启用DPI感知 (在创建任何窗口之前)
+    if sys.platform == "win32" and (config_handler.experimental_dpi_awareness or args.force_dpi):
         try:
             # 适用于 Windows 8.1 及以上版本
             ctypes.windll.shcore.SetProcessDpiAwareness(1)
-            logger.log_info("已启用实验性DPI感知功能。")
+            if args.force_dpi:
+                logger.log_info("已通过命令行参数强制启用DPI感知功能。")
+            else:
+                logger.log_info("已启用实验性DPI感知功能。")
         except (AttributeError, OSError):
             try:
                 # 适用于 Windows Vista 及以上版本
                 ctypes.windll.user32.SetProcessDPIAware()
-                logger.log_info("已启用实验性DPI感知功能 (兼容模式)。")
+                if args.force_dpi:
+                    logger.log_info("已通过命令行参数强制启用DPI感知功能 (兼容模式)。")
+                else:
+                    logger.log_info("已启用实验性DPI感知功能 (兼容模式)。")
             except (AttributeError, OSError):
                 logger.log_warning("无法设置DPI感知，可能在高分屏上显示模糊。")
 
