@@ -1,6 +1,7 @@
 from app import CourseScheduler
 from auto_start import check_and_generate_files
 from logger import logger
+from settings import DpiDebugWindow
 from restart_manager import RestartManager
 from constants import RESOLUTION_PRESETS, STRING_TO_RESOLUTION_KEY
 from config_handler import ConfigHandler
@@ -30,6 +31,8 @@ if __name__ == "__main__":
                        help='设置窗口的几何属性 (例如 "1080p" 或 "宽x高+X+Y")')
     parser.add_argument('--force-dpi', action='store_true',
                        help='强制使用DPI感知模式启动')
+    parser.add_argument('--dedpi', action='store_true',
+                        help='打开DPI调试窗口')
     parser.add_argument('help', nargs='?', default=False,
                        help='显示帮助信息')
     args = parser.parse_args()
@@ -121,6 +124,10 @@ if __name__ == "__main__":
         startup_action=startup_action,
         geometry_override=geometry_override
     )
+
+    # 如果需要，打开DPI调试窗口
+    if args.dedpi:
+        DpiDebugWindow(app)
     
     # 清理可能存在的临时重启资源
     RestartManager.cleanup_restart_manager_resources()

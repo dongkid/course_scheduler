@@ -1128,3 +1128,132 @@ class SettingsWindow:
         else:
             self.heweather_key_label.grid_remove()
             self.heweather_key_entry.grid_remove()
+
+
+class DpiDebugWindow:
+    """一个用于调试DPI设置的小窗口"""
+    def __init__(self, main_app):
+        self.main_app = main_app
+        self.window = tk.Toplevel()
+        self.window.title("DPI调试")
+        self.window.geometry("350x450")
+        self.window.resizable(False, False)
+        self.window.configure(bg="white")
+
+        self.style = ttk.Style()
+        self.style.configure("DPI.TLabel", background="white", font=("微软雅黑", 10))
+        self.style.configure("DPI.TButton", font=("微软雅黑", 10), padding=5)
+        self.style.configure("DPI.TFrame", background="white")
+        self.style.configure("DPI.TRadiobutton", background="white", font=("微软雅黑", 10))
+
+        self._initialize_ui()
+
+    def _initialize_ui(self):
+        main_frame = ttk.Frame(self.window, style="DPI.TFrame")
+        main_frame.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
+
+        self._create_position_controls(main_frame)
+        self._create_size_controls(main_frame)
+        self._create_dpi_controls(main_frame)
+
+    def _create_dpi_controls(self, parent):
+        dpi_frame = ttk.LabelFrame(parent, text="DPI感知模式", style="DPI.TFrame")
+        dpi_frame.pack(fill=tk.X, padx=5, pady=5)
+
+        self.dpi_awareness_var = tk.BooleanVar(value=self.main_app.config_handler.experimental_dpi_awareness)
+
+        ttk.Checkbutton(
+            dpi_frame,
+            text="启用实验性DPI感知",
+            variable=self.dpi_awareness_var,
+            style="DPI.TRadiobutton",
+            command=self._on_dpi_change
+        ).pack(anchor=tk.W, padx=5)
+
+    def _on_dpi_change(self):
+        new_value = self.dpi_awareness_var.get()
+        if new_value != self.main_app.config_handler.experimental_dpi_awareness:
+            self.main_app.config_handler.experimental_dpi_awareness = new_value
+            self.main_app.config_handler.save_config()
+            messagebox.showinfo("需要重启", "DPI感知模式设置已更改，需要重启程序才能生效。", parent=self.window)
+
+    def _create_position_controls(self, parent):
+        pos_frame = ttk.LabelFrame(parent, text="主窗口位置", style="DPI.TFrame")
+        pos_frame.pack(fill=tk.X, padx=5, pady=5)
+
+        button_frame = ttk.Frame(pos_frame, style="DPI.TFrame")
+        button_frame.pack()
+
+        self._create_move_button(button_frame, "↑", 0, -10)
+        self._create_move_button(button_frame, "←", -10, 0)
+        self._create_move_button(button_frame, "→", 10, 0)
+        self._create_move_button(button_frame, "↓", 0, 10)
+
+    def _create_size_controls(self, parent):
+        size_frame = ttk.LabelFrame(parent, text="主窗口大小", style="DPI.TFrame")
+        size_frame.pack(fill=tk.X, padx=5, pady=5)
+
+        # 宽度
+        width_frame = ttk.Frame(size_frame, style="DPI.TFrame")
+        width_frame.pack(fill=tk.X)
+        ttk.Label(width_frame, text="宽度:", style="DPI.TLabel").pack(side=tk.LEFT, padx=5)
+        self.width_var = tk.StringVar(value=self.main_app.root.winfo_width())
+        width_entry = ttk.Entry(width_frame, textvariable=self.width_var, width=7)
+        width_entry.pack(side=tk.LEFT, padx=5)
+        width_entry.bind("<Return>", self._apply_size)
+        self._create_spin_buttons(width_frame, self.width_var, 10)
+
+        # 高度
+        height_frame = ttk.Frame(size_frame, style="DPI.TFrame")
+        height_frame.pack(fill=tk.X)
+        ttk.Label(height_frame, text="高度:", style="DPI.TLabel").pack(side=tk.LEFT, padx=5)
+        self.height_var = tk.StringVar(value=self.main_app.root.winfo_height())
+        height_entry = ttk.Entry(height_frame, textvariable=self.height_var, width=7)
+        height_entry.pack(side=tk.LEFT, padx=5)
+        height_entry.bind("<Return>", self._apply_size)
+        self._create_spin_buttons(height_frame, self.height_var, 10)
+
+    def _create_move_button(self, parent, text, dx, dy):
+        button = ttk.Button(parent, text=text, width=3, style="DPI.TButton")
+        button.pack(side=tk.LEFT, padx=5, pady=5)
+
+        def start_move(event=None):
+            self._move_window(dx, dy)
+            button.after_id = button.after(100, start_move)
+
+        def stop_move(event=None):
+            if hasattr(button, 'after_id'):
+                button.after_cancel(button.after_id)
+
+        button.bind("<ButtonPress-1>", start_move)
+        button.bind("<ButtonRelease-1>", stop_move)
+
+    def _create_spin_buttons(self, parent, var, step):
+        ttk.Button(parent, text="-", width=2, style="DPI.TButton", command=lambda: self._adjust_var(var, -step)).pack(side=tk.LEFT, padx=2)
+        ttk.Button(parent, text="+", width=2, style="DPI.TButton", command=lambda: self._adjust_var(var, step)).pack(side=tk.LEFT, padx=2)
+
+    def _adjust_var(self, var, amount):
+        try:
+            current_value = int(var.get())
+            var.set(str(current_value + amount))
+            self._apply_size()
+        except ValueError:
+            pass
+
+    def _move_window(self, dx, dy):
+        try:
+            root = self.main_app.root
+            new_x = root.winfo_x() + dx
+            new_y = root.winfo_y() + dy
+            root.geometry(f"+{new_x}+{new_y}")
+        except Exception as e:
+            logger.log_error(f"移动窗口时出错: {e}")
+
+    def _apply_size(self, event=None):
+        try:
+            root = self.main_app.root
+            width = int(self.width_var.get())
+            height = int(self.height_var.get())
+            root.geometry(f"{width}x{height}")
+        except (ValueError, tk.TclError) as e:
+            logger.log_error(f"应用窗口大小时出错: {e}")
