@@ -19,10 +19,11 @@ def configure_styles():
     style.layout("AboutWindow.TLabel", [])
 
 class AboutWindow:
-    def __init__(self, parent):
+    def __init__(self, parent, dpi_manager):
         """初始化关于窗口"""
         self.app = parent  # parent 现在是 app 实例
         self.parent = self.app.root
+        self.dpi_manager = dpi_manager
         self.window = self._create_window()
         self._initialize_ui()
         self._start_updater_preload()
@@ -33,10 +34,11 @@ class AboutWindow:
         window.title("关于")
         window.configure(bg="white")
 
-        if not self.app.config_handler.experimental_dpi_awareness:
-            window.geometry("500x200")
-            window.minsize(500, 200)
-            window.maxsize(600, 240)
+        # 使用DPI管理器设置动态窗口大小
+        width = self.dpi_manager.scale(500)
+        height = self.dpi_manager.scale(220)
+        window.geometry(f"{width}x{height}")
+        window.resizable(False, False)
 
         return window
 
@@ -53,45 +55,41 @@ class AboutWindow:
             if not hasattr(self.app, 'updater') or not self.app.updater:
                 self.app.updater = Updater(self.app.root, self.app.config_handler)
 
-    def _update_font_size(self, event=None):
-        """根据窗口宽度动态调整所有文本字体大小"""
-        width = self.window.winfo_width()
-        base_size = max(10, min(50, int(width / 25)))  # 基础字体大小
-        style = ttk.Style()
-        # 标题字体
-        style.configure("AboutWindow.Title.TLabel", font=("Microsoft YaHei", base_size, "bold"), padding=0)
-        # 普通文本字体
-        style.configure("AboutWindow.TLabel", font=("Microsoft YaHei", int(base_size * 0.8)), padding=0)
-        # URL文本字体
-        style.configure("AboutWindow.Url.TLabel", font=("Microsoft YaHei", int(base_size * 0.6), "underline"), padding=0)
-
     def _initialize_ui(self) -> None:
         """初始化关于界面"""
-        if self.app.config_handler.experimental_dpi_awareness:
-            # DPI模式下使用静态字体
-            style = ttk.Style()
-            title_size, base_size, url_size = 16, 12, 10
-            style.configure("AboutWindow.Title.TLabel", font=("Microsoft YaHei", title_size, "bold"))
-            style.configure("AboutWindow.TLabel", font=("Microsoft YaHei", base_size))
-            style.configure("AboutWindow.Url.TLabel", font=("Microsoft YaHei", url_size, "underline"), foreground="blue")
-        else:
-            # 普通模式下绑定动态字体调整
-            self.window.bind("<Configure>", self._update_font_size)
-        
+        # 使用DPI管理器动态设置字体和边距
+        style = ttk.Style()
+        title_size = self.dpi_manager.scale(16)
+        base_size = self.dpi_manager.scale(12)
+        url_size = self.dpi_manager.scale(10)
+        button_font_size = self.dpi_manager.scale(10)
+        scaled_padx = self.dpi_manager.scale(10)
+        scaled_pady = self.dpi_manager.scale(10)
+        scaled_icon_subsample = max(1, int(15 / self.dpi_manager.scaling_factor))
+
+
+        style.configure("AboutWindow.Title.TLabel", font=("Microsoft YaHei", title_size, "bold"))
+        style.configure("AboutWindow.TLabel", font=("Microsoft YaHei", base_size))
+        style.configure("AboutWindow.Url.TLabel", font=("Microsoft YaHei", url_size, "underline"), foreground="blue")
+        style.configure("AboutWindow.TButton", font=("Microsoft YaHei", button_font_size), padding=self.dpi_manager.scale(5))
+        style.configure("AboutWindow.TCheckbutton", font=("Microsoft YaHei", base_size), background="white")
+
+
         # 主容器
         main_frame = ttk.Frame(self.window, style="AboutWindow.TFrame")
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=scaled_padx, pady=scaled_pady)
+
         # 顶部区域：图标和标题
-        top_frame = ttk.Frame(main_frame, style="AboutWindow.TFrame",width=3)
-        top_frame.pack(fill=tk.X, pady=(0, 3))
-        
+        top_frame = ttk.Frame(main_frame, style="AboutWindow.TFrame")
+        top_frame.pack(fill=tk.X, pady=(0, self.dpi_manager.scale(5)))
+
         try:
-            icon = PhotoImage(file=os.path.join(sys._MEIPASS, 'res', 'icon.png')) if hasattr(sys, '_MEIPASS') else PhotoImage(file="res/icon.png")
-            icon = icon.subsample(15, 15)  # 进一步缩小图标
+            icon_path = os.path.join(sys._MEIPASS, 'res', 'icon.png') if hasattr(sys, '_MEIPASS') else "res/icon.png"
+            icon = PhotoImage(file=icon_path)
+            icon = icon.subsample(scaled_icon_subsample, scaled_icon_subsample)
             icon_label = tk.Label(top_frame, image=icon, bg="white")
             icon_label.image = icon
-            icon_label.pack(side=tk.LEFT, padx=(0, 10))
+            icon_label.pack(side=tk.LEFT, padx=(0, scaled_padx))
         except Exception as e:
             print(f"无法加载图标: {e}")
         

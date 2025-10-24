@@ -6,165 +6,65 @@ import json
 from datetime import datetime
 import multiprocessing
 import time
-try:
-    import screeninfo
-except ImportError:
-    screeninfo = None
-from constants import DEFAULT_GEOMETRY, CONFIG_FILE, RESOLUTION_PRESETS
+from constants import CONFIG_FILE, CONFIG_VERSION
 from logger import logger
-
-try:
-    from win10toast import ToastNotifier
-except ImportError:
-    ToastNotifier = None
-
-# 在子进程中运行分辨率读取函数
-def get_screen_resolution_worker(queue):
-    """获取主显示器分辨率并放入队列"""
-    try:
-        if screeninfo:
-            monitors = screeninfo.get_monitors()
-            if not monitors:
-                raise Exception("No monitors found")
-            primary_monitor = next((m for m in monitors if m.is_primary), monitors[0])
-            queue.put((primary_monitor.width, primary_monitor.height))
-        else:
-            queue.put(None)
-    except Exception as e:
-        # 将异常信息放入队列，以便主进程记录
-        queue.put(f"Worker Error: {e}")
-
-# 主进程调用函数
-def get_windows_scaling_factor():
-    """获取 Windows 显示缩放比例，非 Windows 系统或获取失败时返回 100%"""
-    try:
-        # 仅在 Windows 上执行
-        if sys.platform == "win32":
-            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Control Panel\Desktop\WindowMetrics")
-            # 96 DPI 是 100% 缩放
-            applied_dpi = winreg.QueryValueEx(key, "AppliedDPI")[0]
-            winreg.CloseKey(key)
-            return int(applied_dpi / 96 * 100)
-        else:
-            return 100  # 非 Windows 系统默认为 100%
-    except Exception as e:
-        logger.log_warning(f"Failed to get Windows scaling factor: {e}. Defaulting to 100%.")
-        return 100
-
-def get_optimal_geometry():
-    """
-    尝试获取最佳窗口几何位置，考虑屏幕分辨率和Windows缩放。
-    如果在2秒内无法获取，则返回后备默认值。
-    返回一个元组 (geometry, match_type)，其中 match_type 指示匹配的类型。
-    """
-    default_geometry = RESOLUTION_PRESETS.get("default", DEFAULT_GEOMETRY)
-
-    if not screeninfo:
-        logger.log_warning("screeninfo module not found, using default geometry.")
-        return default_geometry, "default"
-
-    queue = multiprocessing.Queue()
-    process = multiprocessing.Process(target=get_screen_resolution_worker, args=(queue,))
-    process.daemon = True
-    
-    try:
-        process.start()
-        resolution = queue.get(timeout=2)
-        process.join()
-
-        if not isinstance(resolution, tuple):
-            logger.log_warning(f"Failed to get resolution from worker: {resolution}. Using default.")
-            return default_geometry, "default"
-
-        logger.log_info(f"Detected screen resolution: {resolution}")
-        scaling_factor = get_windows_scaling_factor()
-        logger.log_info(f"Detected Windows scaling factor: {scaling_factor}%")
-
-        # 过滤出元组键（即分辨率预设）
-        numeric_presets = {k: v for k, v in RESOLUTION_PRESETS.items() if isinstance(k, tuple)}
-        if not numeric_presets:
-            logger.log_warning("No numeric resolution presets found. Using default geometry.")
-            return default_geometry, "default"
-
-        # 1. 尝试完全匹配分辨率和缩放比例
-        if resolution in numeric_presets and scaling_factor in numeric_presets[resolution]:
-            logger.log_info(f"Found exact match for {resolution} at {scaling_factor}% scaling.")
-            return numeric_presets[resolution][scaling_factor], "exact"
-
-        # 2. 尝试匹配分辨率，但缩放比例不匹配时，回退到100%
-        if resolution in numeric_presets and 100 in numeric_presets[resolution]:
-            logger.log_warning(f"Scaling {scaling_factor}% not found for {resolution}. Falling back to 100% scaling for the same resolution.")
-            return numeric_presets[resolution][100], "fallback"
-
-        # 3. 如果分辨率不匹配，则使用向下匹配逻辑
-        screen_width, _ = resolution
-        suitable_presets = {k: v for k, v in numeric_presets.items() if k[0] <= screen_width}
-        
-        if suitable_presets:
-            best_match_key = max(suitable_presets.keys(), key=lambda p: p[0])
-            logger.log_info(f"Resolution {resolution} not in presets. Downward matched to best preset: {best_match_key}.")
-            
-            # 在向下匹配的分辨率中，优先使用原始缩放比例
-            if scaling_factor in suitable_presets[best_match_key]:
-                logger.log_info(f"Found matching scaling {scaling_factor}% for downward matched preset {best_match_key}.")
-                return suitable_presets[best_match_key][scaling_factor], "fallback"
-            
-            # 如果原始缩放比例不存在，则回退到100%
-            if 100 in suitable_presets[best_match_key]:
-                logger.log_warning(f"Scaling {scaling_factor}% not found for preset {best_match_key}. Falling back to 100%.")
-                return suitable_presets[best_match_key][100], "fallback"
-
-        # 4. 如果所有匹配都失败，返回全局默认值
-        logger.log_warning("No suitable preset found after all checks. Using default geometry.")
-        return default_geometry, "default"
-            
-    except (multiprocessing.TimeoutError, queue.Empty, Exception) as e:
-        logger.log_error(f"Failed to get screen resolution: {e}")
-        if process.is_alive():
-            process.terminate()
-        return default_geometry, "default"
 
 
 def check_and_generate_files():
     """检查并生成配置文件和课表文件"""
     # 检查并生成配置文件
     if not os.path.exists(CONFIG_FILE):
-        # 尝试获取最佳窗口位置，否则使用后备默认值
-        optimal_geometry, match_type = get_optimal_geometry()
-        logger.log_info(f"Setting initial geometry to: {optimal_geometry} (match type: {match_type})")
+        logger.log_info("首次启动，正在生成默认配置文件...")
+        messagebox.showinfo(
+            "欢迎使用",
+            "感谢您使用课程表程序！已为您生成默认配置。\n"
+            "您可以在“设置”中根据您的偏好进行调整。"
+        )
 
-        if match_type == "exact":
-            if ToastNotifier:
-                toaster = ToastNotifier()
-                toaster.show_toast(
-                    "布局提示",
-                    "首次启动，已为您自动匹配预设的窗口布局。\n如果布局不符合您的习惯，请在“设置”中进行调整。",
-                    icon_path="res/icon.ico",
-                    duration=10,
-                    threaded=True
-                )
-            else:
-                # Fallback to original messagebox if win10toast is not available
-                messagebox.showinfo(
-                    "布局提示",
-                    "首次启动，已为您自动匹配预设的窗口布局。\n"
-                    "如果布局不符合您的习惯，请在“设置”中进行调整。"
-                )
-        else:  # 'fallback' or 'default'
-            messagebox.showwarning(
-                "布局警告",
-                "首次启动，未能找到完全匹配您屏幕的预设布局。\n"
-                "当前使用的是一个近似或默认的方案，可能不准确。\n"
-                "请务必在“设置”中根据您的偏好进行调整！"
-            )
-
-        default_config = {
-            "geometry": optimal_geometry,
-            "gaokao_year": datetime.now().year + 1,
+        # 直接使用 config_handler 中的默认值来创建 v2 版本的配置文件
+        default_settings = {
+            "window_width_du": 210,
+            "window_height_du": 1030,
+            "countdown_name": "高考",
+            "countdown_date": datetime(datetime.now().year + 1, 6, 7).strftime("%Y-%m-%d"),
             "course_duration": 40,
             "auto_start": False,
-            "font_size": 20,
-            "font_color": "#000000"
+            "auto_complete_end_time": True,
+            "auto_calculate_next_course": True,
+            "break_duration": 10,
+            "default_courses": ["语文", "数学", "英语", "物理", "化学", "生物", "历史", "地理", "政治"],
+            "font_size": 12,
+            "font_color": "#000000",
+            "horizontal_padding": 10,
+            "vertical_padding": 5,
+            "time_display_size": 20,
+            "countdown_size": 18,
+            "schedule_size": 18,
+            "transparent_background": True,
+            "fullscreen_subtitle": "祝考生考试顺利",
+            "debug_mode": False,
+            "auto_update_check_enabled": False,
+            "log_retention_days": 7,
+            "check_prerelease": False,
+            "auto_preview_tomorrow_enabled": False,
+            "preview_tomorrow_trigger_count": 0,
+            "schedule_rotation_enabled": False,
+            "rotation_schedule1": "",
+            "rotation_schedule2": "",
+            "rotation_start_date": datetime.now().strftime("%Y-%m-%d"),
+            "last_weather_location": "",
+            "current_course_time_display_mode": "default",
+            "weather_api_provider": "heweather",
+            "ai_assistant_base_url": "",
+            "ai_assistant_api_key": "",
+            "ai_assistant_model_name": "gemini-2.0-flash"
+        }
+        default_config = {
+            "config_version": CONFIG_VERSION,
+            "current_config": "默认配置",
+            "configs": {
+                "默认配置": default_settings
+            }
         }
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(default_config, f, ensure_ascii=False, indent=2)

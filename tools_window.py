@@ -4,17 +4,19 @@ from typing import Callable
 
 class ToolsWindow:
     """小工具窗口类"""
-    def __init__(self, root: tk.Tk, config_handler, main_app):
+    def __init__(self, root: tk.Tk, config_handler, main_app, dpi_manager):
         """初始化小工具窗口
         
         Args:
             root: 主窗口
             config_handler: 配置处理器
             main_app: 主应用实例
+            dpi_manager: DPI管理器
         """
         self.root = root
         self.config_handler = config_handler
         self.main_app = main_app
+        self.dpi_manager = dpi_manager
         self.window = None
         self.style = ttk.Style()
         
@@ -30,29 +32,33 @@ class ToolsWindow:
         self.window = tk.Toplevel(self.root)
         self.window.title("小工具")
         self.window.resizable(False, False)
-        if self.config_handler.experimental_dpi_awareness:
-            self.window.geometry("1000x300") # 增加高度
-        else:
-            self.window.geometry("800x200")
+
+        # 使用DPI管理器动态设置尺寸和字体
+        width = self.dpi_manager.scale(800)
+        height = self.dpi_manager.scale(200)
+        self.window.geometry(f"{width}x{height}")
         self.window.configure(bg="white")
-        
+
+        scaled_font_size = self.dpi_manager.scale(14)
+        scaled_title_size = self.dpi_manager.scale(24)
+        scaled_button_font_size = self.dpi_manager.scale(12)
+        scaled_padding = self.dpi_manager.scale(10)
+        scaled_padx = self.dpi_manager.scale(20)
+        scaled_pady = self.dpi_manager.scale(20)
+
         # 配置样式
         self.style.configure("TFrame", background="white")
-        self.style.configure("TLabel", background="white", 
-                           font=("微软雅黑", 14))
-        self.style.configure("Title.TLabel", font=("微软雅黑", 24, "bold"),
-                           foreground="#2c3e50")
-        self.style.configure("Subtitle.TLabel", font=("微软雅黑", 14),
-                           foreground="#7f8c8d")
-        self.style.configure("TButton", font=("微软雅黑", 12),
-                           padding=10, width=10)
+        self.style.configure("TLabel", background="white", font=("微软雅黑", scaled_font_size))
+        self.style.configure("Title.TLabel", font=("微软雅黑", scaled_title_size, "bold"), foreground="#2c3e50")
+        self.style.configure("Subtitle.TLabel", font=("微软雅黑", scaled_font_size), foreground="#7f8c8d")
+        self.style.configure("TButton", font=("微软雅黑", scaled_button_font_size), padding=scaled_padding, width=10)
         self.style.map("TButton",
                       foreground=[("active", "#ffffff")],
                       background=[("active", "#3498db")])
-        
+
         # 主容器
         main_frame = ttk.Frame(self.window)
-        main_frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=20)
+        main_frame.pack(expand=True, fill=tk.BOTH, padx=scaled_padx, pady=scaled_pady)
         
         # 添加标题
         title_frame = ttk.Frame(main_frame)
@@ -115,5 +121,5 @@ class ToolsWindow:
     def _show_ai_assistant(self):
         """显示AI助手"""
         from tools.ai_assistant import AIAssistantWindow
-        self.ai_assistant_window = AIAssistantWindow(self.main_app)
+        self.ai_assistant_window = AIAssistantWindow(self.main_app, self.dpi_manager)
         self.ai_assistant_window.show()

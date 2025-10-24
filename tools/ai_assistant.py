@@ -123,15 +123,16 @@ class AIAssistantWindow:
     </html>
     """
 
-    def __init__(self, main_app):
+    def __init__(self, main_app, dpi_manager):
         self.main_app = main_app
         self.config_handler = main_app.config_handler
+        self.dpi_manager = dpi_manager
         self.window = tk.Toplevel(main_app.root)
         self.window.title("AI 助手")
-        if self.config_handler.experimental_dpi_awareness:
-            self.window.geometry("1000x800") # 宽高按比例放大
-        else:
-            self.window.geometry("800x600")
+
+        width = self.dpi_manager.scale(800)
+        height = self.dpi_manager.scale(600)
+        self.window.geometry(f"{width}x{height}")
         self.window.configure(bg="white")
 
         self.history = []
@@ -154,39 +155,20 @@ class AIAssistantWindow:
     def _configure_styles(self):
         style = ttk.Style(self.window)
         style.configure("TFrame", background="white")
-        style.configure("TLabel", background="white",
-                           font=("微软雅黑", 14))
-        # 新增小按钮样式
-        style.configure("PMSmall.TButton",
-                           font=("微软雅黑", 10),
-                           padding=5,
-                           width=3)
+        style.configure("TLabel", background="white", font=("微软雅黑", self.dpi_manager.scale(14)))
+        style.configure("PMSmall.TButton", font=("微软雅黑", self.dpi_manager.scale(10)), padding=self.dpi_manager.scale(5), width=3)
         style.configure("TLabelframe", background="white")
         style.configure("TLabelframe.Label", background="white")
         style.configure("TNotebook", background="white")
-        style.configure("TNotebook.Tab", background="white", padding=[10, 5])
-        # 定义白色风格的Checkbutton
-        style.configure("White.TCheckbutton",
-                           background="white",
-                           font=("微软雅黑", 12))
-        style.map("White.TCheckbutton",
-                      background=[("active", "white")],
-                      foreground=[("active", "black")])
-        style.configure("White.TRadiobutton",
-                           background="white",
-                           font=("微软雅黑", 12))
-        style.map("White.TRadiobutton",
-                       background=[("active", "white")],
-                       foreground=[("active", "black")])
-        style.configure("Title.TLabel", font=("微软雅黑", 24, "bold"),
-                           foreground="#2c3e50")
-        style.configure("Subtitle.TLabel", font=("微软雅黑", 14),
-                           foreground="#7f8c8d")
-        style.configure("TButton", font=("微软雅黑", 12),
-                           padding=10, width=15)
-        style.map("TButton",
-                      foreground=[("active", "#ffffff")],
-                      background=[("active", "#3498db")])
+        style.configure("TNotebook.Tab", background="white", padding=[self.dpi_manager.scale(10), self.dpi_manager.scale(5)])
+        style.configure("White.TCheckbutton", background="white", font=("微软雅黑", self.dpi_manager.scale(12)))
+        style.map("White.TCheckbutton", background=[("active", "white")], foreground=[("active", "black")])
+        style.configure("White.TRadiobutton", background="white", font=("微软雅黑", self.dpi_manager.scale(12)))
+        style.map("White.TRadiobutton", background=[("active", "white")], foreground=[("active", "black")])
+        style.configure("Title.TLabel", font=("微软雅黑", self.dpi_manager.scale(24), "bold"), foreground="#2c3e50")
+        style.configure("Subtitle.TLabel", font=("微软雅黑", self.dpi_manager.scale(14)), foreground="#7f8c8d")
+        style.configure("TButton", font=("微软雅黑", self.dpi_manager.scale(12)), padding=self.dpi_manager.scale(10), width=15)
+        style.map("TButton", foreground=[("active", "#ffffff")], background=[("active", "#3498db")])
 
     def _initialize_ui(self):
         # 创建主 Notebook 控件
@@ -204,23 +186,23 @@ class AIAssistantWindow:
         # --- AI 助手标签页内容 ---
         # 输入区域
         input_frame = ttk.Frame(ai_assistant_tab, style="TFrame")
-        input_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
+        input_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=self.dpi_manager.scale(5), pady=self.dpi_manager.scale(5))
 
         # 对话显示区域
         self.chat_display = TkWebview(ai_assistant_tab)
-        self.chat_display.pack(expand=True, fill=tk.BOTH, padx=5, pady=5)
+        self.chat_display.pack(expand=True, fill=tk.BOTH, padx=self.dpi_manager.scale(5), pady=self.dpi_manager.scale(5))
         self.chat_display.set_html(self.CHAT_HTML_TEMPLATE)
 
-        self.input_entry = ttk.Entry(input_frame, font=("微软雅黑", 12))
-        self.input_entry.pack(side=tk.LEFT, expand=True, fill=tk.X, ipady=5)
+        self.input_entry = ttk.Entry(input_frame, font=("微软雅黑", self.dpi_manager.scale(12)))
+        self.input_entry.pack(side=tk.LEFT, expand=True, fill=tk.X, ipady=self.dpi_manager.scale(5))
         self.input_entry.bind("<Return>", self._on_send)
 
         # 添加图片按钮
         self.image_button = ttk.Button(input_frame, text="🖼️", command=self._ask_with_image, width=3)
-        self.image_button.pack(side=tk.LEFT, padx=5)
+        self.image_button.pack(side=tk.LEFT, padx=self.dpi_manager.scale(5))
 
         self.send_button = ttk.Button(input_frame, text="发送", command=self._on_send)
-        self.send_button.pack(side=tk.LEFT, padx=5)
+        self.send_button.pack(side=tk.LEFT, padx=self.dpi_manager.scale(5))
 
         # --- 智能课表识别标签页内容 ---
         # 状态栏

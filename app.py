@@ -10,15 +10,15 @@ from constants import SCHEDULE_FILE, WEEKDAYS
 from config_handler import ConfigHandler
 from logger import logger
 from main_menu import MainMenu
+from dpi_manager import dpi_manager
 
 class CourseScheduler:
     """课程表主应用类"""
-    def __init__(self, config_handler, startup_action=None, geometry_override=None):
+    def __init__(self, config_handler, startup_action=None):
         """初始化课程表应用
         Args:
             config_handler: 已初始化的配置处理器
             startup_action: 启动时要执行的动作
-            geometry_override: 覆盖窗口几何设置
         """
         self.config_handler = config_handler
         self.startup_action = startup_action
@@ -36,14 +36,17 @@ class CourseScheduler:
             logger.setup(self.config_handler)
             logger.log_debug("Configuration and logger initialized")
             
-            # 创建主窗口并应用配置
+            # 创建主窗口
             self.root = self._create_root_window()
             logger.log_debug("Main window created")
-            # 应用窗口尺寸并强制更新布局
-            if geometry_override:
-                self.root.geometry(geometry_override)
-            else:
-                self.root.geometry(self.config_handler.geometry)
+
+            # 初始化DPI管理器
+            dpi_manager.initialize(self.root)
+            self.dpi_manager = dpi_manager
+            logger.log_info(f"DPI scaling factor detected: {self.dpi_manager.scaling_factor}")
+
+            # 应用动态计算的窗口尺寸和位置
+            self.root.geometry(self._get_initial_geometry())
             self.root.update_idletasks()  # 立即应用窗口布局
             
             # 初始化其他成员变量
@@ -110,6 +113,32 @@ class CourseScheduler:
         root.attributes('-topmost', True)
         root.after(100, lambda: root.attributes('-topmost', False))
         return root
+
+    def _get_initial_geometry(self) -> str:
+        """
+        根据配置和DPI缩放因子计算初始窗口几何信息。
+        窗口将停靠在屏幕右上角。
+        """
+        # 从配置中获取设计单位（DU）的窗口尺寸
+        width_du = self.config_handler.window_width_du
+        height_du = self.config_handler.window_height_du
+
+        # 使用DpiManager进行缩放
+        scaled_width = self.dpi_manager.scale(width_du)
+        scaled_height = self.dpi_manager.scale(height_du)
+
+        # 计算在屏幕右上角的位置
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        
+        x = screen_width - scaled_width
+        y = 0 # 停靠在顶部
+        
+        # 确保窗口不会完全移出屏幕
+        x = max(0, x)
+        y = max(0, y)
+
+        return f"{scaled_width}x{scaled_height}+{x}+{y}"
 
     def cleanup_resources(self):
         """清理所有资源"""
@@ -233,8 +262,9 @@ class CourseScheduler:
     def _initialize_ui(self) -> None:
         """初始化主界面"""
         # 应用配置中的间距设置
-        self.root.configure(padx=self.config_handler.horizontal_padding, 
-                          pady=self.config_handler.vertical_padding)
+        scaled_padx = self.dpi_manager.scale(self.config_handler.horizontal_padding)
+        scaled_pady = self.dpi_manager.scale(self.config_handler.vertical_padding)
+        self.root.configure(padx=scaled_padx, pady=scaled_pady)
         
         self._create_time_display()
         self._create_countdown_display()
@@ -243,12 +273,13 @@ class CourseScheduler:
         
         # 创建主菜单按钮容器
         self.button_frame = tk.Frame(self.root)
-        self.button_frame.pack(pady=self.config_handler.vertical_padding)
+        self.button_frame.pack(pady=scaled_pady)
         
         # 初始化主菜单
         self.main_menu = MainMenu(
             self.root,
             self.config_handler,
+            self.dpi_manager,
             {
                 "编辑课表": self.open_editor,
                 "小工具": self._show_tools_window,
@@ -272,9 +303,12 @@ class CourseScheduler:
 
     def _create_time_display(self) -> None:
         """创建时间显示区域"""
+        scaled_font_size = self.dpi_manager.scale(self.config_handler.time_display_size)
+        font_config = ("微软雅黑", scaled_font_size, "bold")
+
         self.time_date_label = tk.Label(
             self.root,
-            font=("微软雅黑", self.config_handler.time_display_size, "bold"),
+            font=font_config,
             fg=self.config_handler.font_color,
             bg="#ecf0f1"
         )
@@ -282,7 +316,7 @@ class CourseScheduler:
 
         self.weekday_label = tk.Label(
             self.root,
-            font=("微软雅黑", self.config_handler.time_display_size, "bold"),
+            font=font_config,
             fg=self.config_handler.font_color,
             bg="#ecf0f1"
         )
@@ -322,14 +356,18 @@ class CourseScheduler:
 
     def _create_countdown_display(self) -> None:
         """创建倒计时显示区域"""
+        scaled_pady = self.dpi_manager.scale(self.config_handler.vertical_padding)
         self.countdown_frame = tk.Frame(self.root)
-        self.countdown_frame.pack(pady=self.config_handler.vertical_padding)
+        self.countdown_frame.pack(pady=scaled_pady)
         
+        scaled_size_large = self.dpi_manager.scale(self.config_handler.countdown_size)
+        scaled_size_small = self.dpi_manager.scale(max(1, self.config_handler.countdown_size - 4))
+
         # 第一行：显示自定义倒计时名称
         self.countdown_label1 = tk.Label(
             self.countdown_frame,
             text=f"距离{self.config_handler.countdown_name}",
-            font=("微软雅黑", self.config_handler.countdown_size - 4),
+            font=("微软雅黑", scaled_size_small),
             fg=self.config_handler.font_color,
             bg="#ecf0f1"
         )
@@ -341,7 +379,7 @@ class CourseScheduler:
         
         self.countdown_label2 = tk.Label(
             self.countdown_line2_frame,
-            font=("微软雅黑", self.config_handler.countdown_size - 2, "bold"),
+            font=("微软雅黑", scaled_size_large, "bold"),
             fg=self.config_handler.font_color,
             bg="#ecf0f1"
         )
@@ -350,7 +388,7 @@ class CourseScheduler:
         self.countdown_label3 = tk.Label(
             self.countdown_line2_frame,
             text="天",
-            font=("微软雅黑", self.config_handler.countdown_size - 4),
+            font=("微软雅黑", scaled_size_small),
             fg=self.config_handler.font_color,
             bg="#ecf0f1"
         )
@@ -358,16 +396,19 @@ class CourseScheduler:
 
     def _create_schedule_display(self) -> None:
         """创建课程表显示区域"""
+        scaled_padx = self.dpi_manager.scale(self.config_handler.horizontal_padding)
+        scaled_pady = self.dpi_manager.scale(self.config_handler.vertical_padding)
         self.schedule_frame = tk.Frame(self.root)
-        self.schedule_frame.pack(padx=self.config_handler.horizontal_padding, 
-                               pady=self.config_handler.vertical_padding, 
+        self.schedule_frame.pack(padx=scaled_padx,
+                               pady=scaled_pady,
                                fill=tk.BOTH, expand=True)
         self._bind_schedule_events()
 
     def _create_preview_icons(self) -> None:
         """创建预览状态图标"""
         # 使用一种通用字体来显示表情符号
-        emoji_font = ("Segoe UI Emoji", 12)
+        scaled_emoji_size = self.dpi_manager.scale(12)
+        emoji_font = ("Segoe UI Emoji", scaled_emoji_size)
         # 获取schedule_frame的背景色，以便图标融合
         bg_color = self.schedule_frame.cget('bg')
         
@@ -379,17 +420,19 @@ class CourseScheduler:
         is_previewing = self.displayed_weekday != datetime.now().weekday()
         
         # 调整图标位置和间距
+        scaled_offset_x = self.dpi_manager.scale(10)
+        scaled_offset_y = self.dpi_manager.scale(10)
+        lock_icon_x_offset = self.dpi_manager.scale(35)
+
         if is_previewing:
             # 眼睛图标现在在最右侧
-            self.preview_eye_icon.place(relx=1.0, rely=1.0, x=-10, y=-10, anchor='se')
+            self.preview_eye_icon.place(relx=1.0, rely=1.0, x=-scaled_offset_x, y=-scaled_offset_y, anchor='se')
         else:
             self.preview_eye_icon.place_forget()
 
         if is_previewing and self.is_view_locked:
-            # 根据DPI感知模式调整锁图标的间距
-            lock_icon_x_offset = -45 if self.config_handler.experimental_dpi_awareness else -35
             # 锁图标在眼睛图标的左边
-            self.preview_lock_icon.place(relx=1.0, rely=1.0, x=lock_icon_x_offset, y=-10, anchor='se')
+            self.preview_lock_icon.place(relx=1.0, rely=1.0, x=-(scaled_offset_x + lock_icon_x_offset), y=-scaled_offset_y, anchor='se')
         else:
             self.preview_lock_icon.place_forget()
 
@@ -420,10 +463,11 @@ class CourseScheduler:
                     self._update_schedule_display(now.weekday())
                 else:
                     # 保持预览状态的显示（日期不变，星期为斜体）
+                    scaled_font_size = self.dpi_manager.scale(self.config_handler.time_display_size)
                     self.time_date_label.config(text=now.strftime("%Y-%m-%d"))
                     self.weekday_label.config(
                         text=f"星期{WEEKDAYS[self.displayed_weekday]}",
-                        font=("微软雅黑", self.config_handler.time_display_size, "bold italic")
+                        font=("微软雅黑", scaled_font_size, "bold italic")
                     )
 
                 self.last_second = current_second
@@ -444,10 +488,12 @@ class CourseScheduler:
 
     def _update_time_display(self, now: datetime) -> None:
         """更新时间显示"""
-        self.time_date_label.config(text=now.strftime("%Y-%m-%d\n%H:%M:%S"))
+        scaled_font_size = self.dpi_manager.scale(self.config_handler.time_display_size)
+        font_config = ("微软雅黑", scaled_font_size, "bold")
+        self.time_date_label.config(text=now.strftime("%Y-%m-%d\n%H:%M:%S"), font=font_config)
         self.weekday_label.config(
             text=f"星期{WEEKDAYS[now.weekday()]}",
-            font=("微软雅黑", self.config_handler.time_display_size, "bold")
+            font=font_config
         )
         # 如果是新的一天，重置预览标志
         if now.hour == 0 and now.minute == 0 and now.second == 0:
@@ -476,10 +522,11 @@ class CourseScheduler:
         # 更新时间标签以反映当前显示的星期
         displayed_day_str = f"星期{WEEKDAYS[weekday_to_show]}"
         if weekday_to_show != now.weekday():
+            scaled_font_size = self.dpi_manager.scale(self.config_handler.time_display_size)
             self.time_date_label.config(text=now.strftime("%Y-%m-%d"))
             self.weekday_label.config(
                 text=displayed_day_str,
-                font=("微软雅黑", self.config_handler.time_display_size, "bold italic")
+                font=("微软雅黑", scaled_font_size, "bold italic")
             )
         else:
             # 仅在显示当天时才更新秒数
@@ -596,12 +643,8 @@ class CourseScheduler:
         label.last_color = color
         
         if hasattr(label, 'status_canvas'):
-            # 缓存字体大小计算
-            if not hasattr(label, 'cached_circle_size'):
-                scale_factor = 1.8 if self.config_handler.experimental_dpi_awareness else 1.2
-                label.cached_circle_size = int(self.config_handler.schedule_size * scale_factor)
-            
-            circle_size = label.cached_circle_size
+            # 指示器大小应该是字体大小的1.8倍，以获得更好的视觉效果
+            circle_size = int(self.dpi_manager.scale(self.config_handler.schedule_size) * 1.8)
             label.status_canvas.config(width=circle_size, height=circle_size)
             
             # 强制重绘Canvas
@@ -616,38 +659,43 @@ class CourseScheduler:
     def _update_font_settings(self) -> None:
         """更新所有UI组件的字体设置"""
         # 更新时间显示
-        font_config = ("微软雅黑", self.config_handler.font_size, "bold")
-        self.time_date_label.config(font=font_config, fg=self.config_handler.font_color)
-        self.weekday_label.config(font=font_config, fg=self.config_handler.font_color)
+        scaled_time_font_size = self.dpi_manager.scale(self.config_handler.time_display_size)
+        time_font_config = ("微软雅黑", scaled_time_font_size, "bold")
+        self.time_date_label.config(font=time_font_config, fg=self.config_handler.font_color)
+        self.weekday_label.config(font=time_font_config, fg=self.config_handler.font_color)
         
         # 更新课程标签色块尺寸
+        scaled_schedule_size = self.dpi_manager.scale(self.config_handler.schedule_size)
         if hasattr(self, 'course_labels'):
             for label in self.course_labels:
                 if hasattr(label, 'status_canvas'):
-                    scale_factor = 1.8 if self.config_handler.experimental_dpi_awareness else 1.2
-                    circle_size = int(self.config_handler.schedule_size * scale_factor)
+                    # 指示器大小应该是字体大小的1.8倍，以获得更好的视觉效果
+                    circle_size = int(scaled_schedule_size * 1.8)
                     label.status_canvas.config(width=circle_size, height=circle_size)
                     label.status_canvas.coords(label.status_canvas.oval_id, 0, 0, circle_size, circle_size)
         
         # 更新倒计时显示
+        scaled_countdown_large = self.dpi_manager.scale(self.config_handler.countdown_size)
+        scaled_countdown_small = self.dpi_manager.scale(max(1, self.config_handler.countdown_size - 4))
         self.countdown_label1.config(
-            font=("微软雅黑", self.config_handler.font_size - 4),
+            font=("微软雅黑", scaled_countdown_small),
             fg=self.config_handler.font_color
         )
         self.countdown_label2.config(
-            font=("微软雅黑", self.config_handler.font_size - 2, "bold"),
+            font=("微软雅黑", scaled_countdown_large, "bold"),
             fg=self.config_handler.font_color
         )
         self.countdown_label3.config(
-            font=("微软雅黑", self.config_handler.font_size - 4),
+            font=("微软雅黑", scaled_countdown_small),
             fg=self.config_handler.font_color
         )
         
         # 更新课程标签
+        schedule_font_config = ("微软雅黑", scaled_schedule_size, "bold")
         self.course_labels = [label for label in self.course_labels if label.winfo_exists()]
         for label in self.course_labels:
             label.config(
-                font=("微软雅黑", self.config_handler.schedule_size, "bold"),
+                font=schedule_font_config,
                 fg=self.config_handler.font_color
             )
         
@@ -675,13 +723,17 @@ class CourseScheduler:
 
     def _create_new_label(self, course: Dict[str, str], color: str, now: datetime, row: int) -> None:
         """创建新课程标签"""
+        scaled_pady = self.dpi_manager.scale(2)
         course_frame = tk.Frame(self.schedule_frame)
-        course_frame.grid(row=row, column=0, sticky="ew", pady=2)  # 使用指定的行号
+        course_frame.grid(row=row, column=0, sticky="ew", pady=scaled_pady)  # 使用指定的行号
         
+        scaled_font_size = self.dpi_manager.scale(self.config_handler.schedule_size)
+        font_config = ("微软雅黑", scaled_font_size, "bold")
+
         label = tk.Label(
             course_frame,
             text=self._get_course_display_text(course, color, now),
-            font=("微软雅黑", self.config_handler.schedule_size, "bold"),
+            font=font_config,
             fg=self.config_handler.font_color,
             anchor='w'
         )
@@ -691,9 +743,8 @@ class CourseScheduler:
         self._bind_events_to_widget(course_frame)
         label.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
-        # 根据字体大小计算色块尺寸
-        scale_factor = 1.8 if self.config_handler.experimental_dpi_awareness else 1.2
-        circle_size = int(self.config_handler.schedule_size * scale_factor)
+        # 根据字体大小计算色块尺寸，指示器大小应该是字体大小的1.8倍
+        circle_size = int(scaled_font_size * 1.8)
         status_canvas = tk.Canvas(
             course_frame,
             width=circle_size,
@@ -704,7 +755,8 @@ class CourseScheduler:
         # 保存圆形图形的ID以便后续更新
         oval_id = status_canvas.create_oval(0, 0, circle_size, circle_size, fill=color, outline=color)
         status_canvas.oval_id = oval_id  # 存储图形ID
-        status_canvas.pack(side=tk.RIGHT, padx=5)
+        scaled_padx = self.dpi_manager.scale(5)
+        status_canvas.pack(side=tk.RIGHT, padx=scaled_padx)
         label.status_canvas = status_canvas
         self.course_labels.append(label)
         
@@ -875,7 +927,7 @@ class CourseScheduler:
     def open_about(self):
         from about_window import AboutWindow
         if self.about_window is None or not self.about_window.window.winfo_exists():
-            self.about_window = AboutWindow(self) # 传递整个app实例
+            self.about_window = AboutWindow(self, self.dpi_manager) # 传递app和dpi_manager实例
         else:
             self.about_window.window.lift()
             
@@ -898,7 +950,7 @@ class CourseScheduler:
         """显示小工具窗口"""
         from tools_window import ToolsWindow
         if not hasattr(self, 'tools_window') or not self.tools_window.window.winfo_exists():
-            self.tools_window = ToolsWindow(self.root, self.config_handler, self)
+            self.tools_window = ToolsWindow(self.root, self.config_handler, self, self.dpi_manager)
         self.tools_window.show()
 
     def start_background_update_check(self):

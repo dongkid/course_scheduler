@@ -2,7 +2,7 @@ import json
 import os
 import threading
 from datetime import datetime
-from constants import DEFAULT_GEOMETRY, CONFIG_FILE, CONFIG_VERSION
+from constants import CONFIG_FILE, CONFIG_VERSION
 from tools.config_converter import convert_v1_to_v2
 
 class ConfigHandler:
@@ -13,7 +13,9 @@ class ConfigHandler:
 
     def _set_default_attributes(self):
         """设置所有配置属性的默认值"""
-        self.geometry = DEFAULT_GEOMETRY
+        # 窗口尺寸现在使用设计单位 (DU)
+        self.window_width_du = 210
+        self.window_height_du = 1030
         self.countdown_name = "高考"
         self.countdown_date = datetime(datetime.now().year + 1, 6, 7)
         self.heweather_api_key = ""
@@ -48,7 +50,6 @@ class ConfigHandler:
         self.ai_assistant_base_url = ""
         self.ai_assistant_api_key = ""
         self.ai_assistant_model_name = "gemini-2.0-flash"
-        self.experimental_dpi_awareness = False
 
     def check_registry_auto_start(self):
         """检查注册表中是否存在开机自启动项"""
@@ -99,7 +100,8 @@ class ConfigHandler:
     def _create_default_config_file(self):
         """创建一个全新的默认v2配置文件"""
         default_settings = {
-            "geometry": DEFAULT_GEOMETRY,
+            "window_width_du": 210,
+            "window_height_du": 1030,
             "countdown_name": "高考",
             "countdown_date": datetime(datetime.now().year + 1, 6, 7).strftime("%Y-%m-%d"),
             "course_duration": 40,
@@ -132,8 +134,7 @@ class ConfigHandler:
             "weather_api_provider": "heweather",
             "ai_assistant_base_url": "",
             "ai_assistant_api_key": "",
-            "ai_assistant_model_name": "gemini-2.0-flash",
-            "experimental_dpi_awareness": False
+            "ai_assistant_model_name": "gemini-2.0-flash"
         }
         self.config = {
             "config_version": CONFIG_VERSION,
@@ -179,7 +180,8 @@ class ConfigHandler:
                 logger.log_warning(f"日期配置项 '{key}' 的值 '{date_str}' 格式无效，已重置为默认。")
                 return datetime.strptime(default_date_str, "%Y-%m-%d")
 
-        self.geometry = get_str("geometry", DEFAULT_GEOMETRY)
+        self.window_width_du = get_int("window_width_du", 210)
+        self.window_height_du = get_int("window_height_du", 1030)
         self.countdown_name = get_str("countdown_name", "高考")
         self.countdown_date = get_date("countdown_date", f"{datetime.now().year + 1}-06-07")
         self.heweather_api_key = get_str("heweather_api_key", "")
@@ -214,7 +216,6 @@ class ConfigHandler:
         self.ai_assistant_base_url = get_str("ai_assistant_base_url", "")
         self.ai_assistant_api_key = get_str("ai_assistant_api_key", "")
         self.ai_assistant_model_name = get_str("ai_assistant_model_name", "gemini-2.0-flash")
-        self.experimental_dpi_awareness = get_bool("experimental_dpi_awareness", False)
 
     def save_config(self):
         """将当前实例属性保存到文件中对应的配置方案下"""
@@ -237,7 +238,8 @@ class ConfigHandler:
 
         # 将当前实例的属性更新到字典中
         active_config_data.update({
-            "geometry": self.geometry if self.geometry else DEFAULT_GEOMETRY,
+            "window_width_du": self.window_width_du,
+            "window_height_du": self.window_height_du,
             "countdown_name": self.countdown_name,
             "countdown_date": self.countdown_date.strftime("%Y-%m-%d"),
             "heweather_api_key": self.heweather_api_key,
@@ -271,8 +273,7 @@ class ConfigHandler:
             "weather_api_provider": self.weather_api_provider,
             "ai_assistant_base_url": self.ai_assistant_base_url,
             "ai_assistant_api_key": self.ai_assistant_api_key,
-            "ai_assistant_model_name": self.ai_assistant_model_name,
-            "experimental_dpi_awareness": self.experimental_dpi_awareness
+            "ai_assistant_model_name": self.ai_assistant_model_name
         })
         
         # 更新到主配置字典中
